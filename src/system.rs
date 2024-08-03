@@ -1,6 +1,6 @@
-use libc::statfs as libc_statfs_struct;
+use nix::sys::statvfs::statvfs;
+
 use std::env;
-use std::ffi::CString;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
@@ -16,34 +16,22 @@ pub fn get_username_and_hostname() -> Result<String, io::Error> {
     Ok(format!("{YELLOW}{}{RED}@{GREEN}{}", username, hostname))
 }
 
-pub fn get_disk_usage() -> Result<String, io::Error> {
-    let path = CString::new("/").expect("CString::new failed");
+pub fn get_root_disk_usage() -> Result<String, Box<dyn std::error::Error>> {
+    let vfs = statvfs("/")?;
+    let block_size = vfs.block_size() as u64;
+    let total_blocks = vfs.blocks();
+    let available_blocks = vfs.blocks_available();
 
-    let mut fs_stat: libc_statfs_struct = unsafe { std::mem::zeroed() };
-    let result = unsafe { libc::statfs(path.as_ptr(), &mut fs_stat) };
+    let total_size = block_size * total_blocks;
+    let used_size = total_size - (block_size * available_blocks);
 
-    if result != 0 {
-        return Err(io::Error::last_os_error());
-    }
-
-    let block_size = fs_stat.f_bsize as u64;
-    let total_blocks = fs_stat.f_blocks as u64;
-    let free_blocks = fs_stat.f_bfree as u64;
-
-    let total_size_bytes = total_blocks * block_size;
-    let used_size_bytes = (total_blocks - free_blocks) * block_size;
-
-    let total_size_gib = total_size_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
-    let used_size_gib = used_size_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
-    let percentage_used = (used_size_bytes as f64 / total_size_bytes as f64) * 100.0;
-
-    let formatted_total_size = format!("{:.2}", total_size_gib);
-    let formatted_used_size = format!("{:.2}", used_size_gib);
-    let formatted_percentage_used = format!("{:.0}", percentage_used);
+    let total_size_gib = total_size as f64 / (1024.0 * 1024.0 * 1024.0);
+    let used_size_gib = used_size as f64 / (1024.0 * 1024.0 * 1024.0);
+    let usage_percentage = (used_size as f64 / total_size as f64) * 100.0;
 
     Ok(format!(
-        "{} GiB / {} GiB ({CYAN}{}%{RESET})",
-        formatted_used_size, formatted_total_size, formatted_percentage_used
+        "{:.2} GiB / {:.2} GiB ({CYAN}{:.0}%{RESET})",
+        used_size_gib, total_size_gib, usage_percentage
     ))
 }
 
