@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
-pub fn get_system_uptime() -> Result<String, io::Error> {
+pub fn get_current() -> Result<String, io::Error> {
     let path = Path::new("/proc/uptime");
     let file = File::open(path)?;
     let reader = io::BufReader::new(file);

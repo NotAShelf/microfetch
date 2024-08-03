@@ -10,7 +10,7 @@ use crate::colors::{BLUE, CYAN, RESET};
 use crate::desktop::get_desktop_info;
 use crate::release::{get_os_pretty_name, get_system_info};
 use crate::system::{get_memory_usage, get_root_disk_usage, get_username_and_hostname};
-use crate::uptime::get_system_uptime;
+use crate::uptime::get_current;
 
 fn main() -> Result<(), Report> {
     color_eyre::install()?;
@@ -18,7 +18,7 @@ fn main() -> Result<(), Report> {
     let user_info = get_username_and_hostname()?;
     let os_name = get_os_pretty_name()?;
     let kernel_version = get_system_info()?;
-    let uptime = get_system_uptime()?;
+    let uptime = get_current()?;
     let window_manager = get_desktop_info()?;
     let memory_usage = get_memory_usage()?;
     let storage = get_root_disk_usage()?;
@@ -54,16 +54,6 @@ fn print_system_info(
 {BLUE} 🬷▛🮃{CYAN}▙    ▟▛          {CYAN}  {BLUE}WM{RESET}            {window_manager}
 {BLUE} 🮃 {CYAN}▟█🬴{BLUE}▀▀▀█🬴▀▀        {CYAN}󰍛  {BLUE}Memory{RESET}        {memory_usage}
 {CYAN}  ▝▀ ▀▘   {BLUE}▀▘         {CYAN}󱥎  {BLUE}Storage (/){RESET}   {storage}
-    ",
-        CYAN = CYAN,
-        BLUE = BLUE,
-        RESET = RESET,
-        user_info = user_info,
-        os_name = os_name,
-        kernel_version = kernel_version,
-        uptime = uptime,
-        window_manager = window_manager,
-        memory_usage = memory_usage,
-        storage = storage
+    "
     );
 }

@@ -22,5 +22,5 @@ pub fn get_desktop_info() -> Result<String, io::Error> {
         &display_backend
     };
 
-    Ok(format!("{} ({})", desktop_env, display_backend))
+    Ok(format!("{desktop_env} ({display_backend})"))
 }

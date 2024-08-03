@@ -1,4 +1,4 @@
-use color_eyre::{Result};
+use color_eyre::Result;
 use std::fs::{self, read_to_string};
 use std::io::{self, Read};
 
@@ -49,8 +49,5 @@ pub fn get_os_pretty_name() -> Result<String, io::Error> {
                 .to_string()
         });
 
-    match pretty_name {
-        Some(name) => Ok(name),
-        None => Ok("Unknown".to_string()),
-    }
+    Ok(pretty_name.unwrap_or_else(|| "Unknown".to_string()))
 }
