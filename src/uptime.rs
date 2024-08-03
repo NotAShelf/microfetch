@@ -27,15 +27,15 @@ pub fn get_system_uptime() -> Result<String, io::Error> {
 
     let mut parts = Vec::new();
     if days > 0 {
-        parts.push(format!("{} days", days));
+        parts.push(format!("{days} days"));
     }
 
     if hours > 0 || days > 0 {
-        parts.push(format!("{} hours", hours));
+        parts.push(format!("{hours} hours"));
     }
 
     if minutes > 0 || hours > 0 || days > 0 {
-        parts.push(format!("{} minutes", minutes));
+        parts.push(format!("{minutes} minutes"));
     }
 
     Ok(parts.join(", "))

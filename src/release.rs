@@ -34,7 +34,7 @@ pub fn get_system_info() -> Result<String, io::Error> {
 
     let architecture = get_architecture()?;
 
-    let result = format!("{} {} ({})", system, kernel_release, architecture);
+    let result = format!("{system} {kernel_release} ({architecture})");
     Ok(result)
 }
 

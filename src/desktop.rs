@@ -9,5 +9,5 @@ pub fn get_desktop_info() -> Result<String, io::Error> {
     // instead of just "foo"
     let desktop_env = desktop_env.trim_start_matches("none+");
 
-    Ok(format!("{} ({})", desktop_env, display_backend))
+    Ok(format!("{desktop_env} ({display_backend})"))
 }

@@ -13,7 +13,7 @@ pub fn get_username_and_hostname() -> Result<String, io::Error> {
     let output = Command::new("hostname").output()?;
     let hostname = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-    Ok(format!("{YELLOW}{}{RED}@{GREEN}{}", username, hostname))
+    Ok(format!("{YELLOW}{username}{RED}@{GREEN}{hostname}"))
 }
 
 pub fn get_root_disk_usage() -> Result<String, Box<dyn std::error::Error>> {
@@ -30,8 +30,7 @@ pub fn get_root_disk_usage() -> Result<String, Box<dyn std::error::Error>> {
     let usage_percentage = (used_size as f64 / total_size as f64) * 100.0;
 
     Ok(format!(
-        "{:.2} GiB / {:.2} GiB ({CYAN}{:.0}%{RESET})",
-        used_size_gib, total_size_gib, usage_percentage
+        "{used_size_gib:.2} GiB / {total_size_gib:.2} GiB ({CYAN}{usage_percentage:.0}%{RESET})"
     ))
 }
 
@@ -78,7 +77,6 @@ pub fn get_memory_usage() -> Result<String, io::Error> {
     let percentage_used = (used_memory / total_memory * 100.0).round() as u64;
 
     Ok(format!(
-        "{:.2} GiB / {:.2} GiB ({CYAN}{}%{RESET})",
-        used_memory, total_memory, percentage_used
+        "{used_memory:.2} GiB / {total_memory:.2} GiB ({CYAN}{percentage_used}%{RESET})"
     ))
 }
