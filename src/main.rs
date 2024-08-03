@@ -1,8 +1,9 @@
+use color_eyre::{Report, Result};
 use libc::statfs as libc_statfs_struct;
 use std::env;
 use std::ffi::CString;
 use std::fs::{self, File};
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Read};
 use std::path::Path;
 use std::process::Command;
 
@@ -13,17 +14,20 @@ const GREEN: &str = "\x1b[32m";
 const YELLOW: &str = "\x1b[33m";
 const RED: &str = "\x1b[31m";
 
-fn main() {
+fn main() -> Result<(), Report> {
+    color_eyre::install()?;
+
     let user_info = get_username_and_hostname().expect("Failed to get username and hostname");
     let os_name = get_os_pretty_name().expect("Failed to get OS name");
-    let kernel_version = get_kernel_info().expect("Failed to get kernel info");
+    let kernel_version = get_system_info().expect("Failed to get kernel info");
     let uptime = get_system_uptime().expect("Failed to get uptime");
     let window_manager = get_desktop_info().expect("Failed to get desktop info");
     let memory_usage = get_memory_usage().expect("Failed to get memory usage");
     let storage = get_disk_usage().expect("Failed to get storage info");
 
     // Construct the ASCII art with dynamic OS name
-    let ascii_art = format!(
+
+    println!(
         "
 {CYAN}  ▗▄   {BLUE}▗▄ ▄▖         {} ~{RESET}
 {CYAN} ▄▄🬸█▄▄▄{BLUE}🬸█▛ {CYAN}▃        {CYAN}  {BLUE}System{RESET}    {}
@@ -36,7 +40,7 @@ fn main() {
         user_info, os_name, kernel_version, uptime, window_manager, memory_usage, storage
     );
 
-    println!("{}", ascii_art);
+    Ok(())
 }
 
 fn get_username_and_hostname() -> Result<String, io::Error> {
@@ -192,28 +196,38 @@ fn get_system_uptime() -> Result<String, io::Error> {
     Ok(parts.join(", "))
 }
 
-fn get_kernel_info() -> Result<String, Box<dyn std::error::Error>> {
-    let uname_s = Command::new("uname")
-        .arg("-s")
-        .output()
-        .expect("Failed to execute command");
+fn get_system_info() -> Result<String, io::Error> {
+    // Try to detect OS type as accurately as possible and without depending on uname.
+    // /etc/os-release should generally imply Linux, and /etc/bsd-release would imply BSD system.
+    fn detect_os() -> Result<String, io::Error> {
+        if fs::metadata("/etc/os-release").is_ok() || fs::metadata("/usr/lib/os-release").is_ok() {
+            Ok("Linux".to_string())
+        } else if fs::metadata("/etc/rc.conf").is_ok() || fs::metadata("/etc/bsd-release").is_ok() {
+            Ok("BSD".to_string())
+        } else {
+            Ok("Unknown".to_string())
+        }
+    }
 
-    let uname_r = Command::new("uname")
-        .arg("-r")
-        .output()
-        .expect("Failed to execute command");
+    let system = detect_os()?;
 
-    let uname_m = Command::new("uname")
-        .arg("-m")
-        .output()
-        .expect("Failed to execute command");
+    let mut kernel_release = String::new();
+    fs::File::open("/proc/sys/kernel/osrelease")?.read_to_string(&mut kernel_release)?;
+    let kernel_release = kernel_release.trim().to_string(); // Remove any trailing newline
 
-    let kernel_name = String::from_utf8_lossy(&uname_s.stdout).trim().to_string();
-    let kernel_release = String::from_utf8_lossy(&uname_r.stdout).trim().to_string();
-    let machine_hardware = String::from_utf8_lossy(&uname_m.stdout).trim().to_string();
+    let mut cpuinfo = String::new();
+    fs::File::open("/proc/cpuinfo")?.read_to_string(&mut cpuinfo)?;
 
-    Ok(format!(
-        "{} {} ({})",
-        kernel_name, kernel_release, machine_hardware
-    ))
+    let architecture = if let Some(line) = cpuinfo.lines().find(|line| line.contains("flags")) {
+        if line.contains("lm") {
+            "x86_64".to_string()
+        } else {
+            "unknown".to_string()
+        }
+    } else {
+        "unknown".to_string()
+    };
+
+    let result = format!("{} {} ({})", system, kernel_release, architecture);
+    Ok(result)
 }

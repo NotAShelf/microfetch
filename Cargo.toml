@@ -5,5 +5,8 @@ edition = "2021"
 
 [dependencies]
 libc = "0.2"
+fs_extra = "1.2"
+color-eyre = { version = "0.6", default-features = false }
+
 
 
