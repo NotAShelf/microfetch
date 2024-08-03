@@ -1,4 +1,4 @@
-use color_eyre::Result;
+use color_eyre::{Result};
 use std::fs::{self, read_to_string};
 use std::io::{self, Read};
 
@@ -38,11 +38,10 @@ pub fn get_system_info() -> Result<String, io::Error> {
     Ok(result)
 }
 
-pub fn get_os_pretty_name() -> Option<String> {
-    let os_release_content = read_to_string("/etc/os-release").ok()?;
-    let os_release_lines: Vec<&str> = os_release_content.lines().collect();
-    let pretty_name = os_release_lines
-        .iter()
+pub fn get_os_pretty_name() -> Result<String, io::Error> {
+    let os_release_content = read_to_string("/etc/os-release")?;
+    let pretty_name = os_release_content
+        .lines()
         .find(|line| line.starts_with("PRETTY_NAME="))
         .map(|line| {
             line.trim_start_matches("PRETTY_NAME=")
@@ -50,5 +49,8 @@ pub fn get_os_pretty_name() -> Option<String> {
                 .to_string()
         });
 
-    pretty_name
+    match pretty_name {
+        Some(name) => Ok(name),
+        None => Ok("Unknown".to_string()),
+    }
 }
