@@ -108,7 +108,6 @@ name = "microfetch"
 version = "0.1.0"
 dependencies = [
  "color-eyre",
- "libc",
  "nix",
 ]
 
