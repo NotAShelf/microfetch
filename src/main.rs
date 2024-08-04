@@ -47,13 +47,24 @@ fn print_system_info(
 ) {
     println!(
         "
-{CYAN}  ▗▄   {BLUE}▗▄ ▄▖         {user_info} ~{RESET}
-{CYAN} ▄▄🬸█▄▄▄{BLUE}🬸█▛ {CYAN}▃        {CYAN}  {BLUE}System{RESET}        {os_name}
-{BLUE}   ▟▛    ▜{CYAN}▃▟🬕        {CYAN}  {BLUE}Kernel{RESET}        {kernel_version}
-{BLUE}🬋🬋🬫█      {CYAN}█🬛🬋🬋       {CYAN}  {BLUE}Uptime{RESET}        {uptime}
-{BLUE} 🬷▛🮃{CYAN}▙    ▟▛          {CYAN}  {BLUE}WM{RESET}            {window_manager}
-{BLUE} 🮃 {CYAN}▟█🬴{BLUE}▀▀▀█🬴▀▀        {CYAN}󰍛  {BLUE}Memory{RESET}        {memory_usage}
-{CYAN}  ▝▀ ▀▘   {BLUE}▀▘         {CYAN}󱥎  {BLUE}Storage (/){RESET}   {storage}
+{CYAN}   ▜▙▖  {BLUE}▝▜▙ ▟█▘       {user_info} ~{RESET}
+{CYAN} ▗▟█████▙▖{BLUE}▜██▘ {CYAN}▟▙     {CYAN}  {BLUE}System{RESET}        {os_name}
+{BLUE}    ▄▖     ▜▛ {CYAN}▟▛▘     {CYAN}  {BLUE}Kernel{RESET}        {kernel_version}
+{BLUE}▟███▛ {CYAN}▖    {BLUE}▝ {CYAN}▟███▛    {CYAN}  {BLUE}Uptime{RESET}        {uptime}
+{BLUE} ▗▟▛ {CYAN}▟▙     ▝▀        {CYAN}  {BLUE}WM{RESET}            {window_manager}
+{BLUE} ▜▛ {CYAN}▗██▙{BLUE}▝▜█████▛▘     {CYAN}󰍛  {BLUE}Memory{RESET}        {memory_usage}
+{CYAN}   ▗█▛ ▜▙▖  {BLUE}▝▜▙       {CYAN}󱥎  {BLUE}Storage (/){RESET}   {storage}
+
+
+ {CYAN}     ▟█▖    {BLUE}▝█▙ ▗█▛          {user_info} ~{RESET}
+ {CYAN}  ▗▄▄▟██▄▄▄▄▄{BLUE}▝█▙█▛  {CYAN}▖        {CYAN}  {BLUE}System{RESET}        {os_name}
+ {CYAN}  ▀▀▀▀▀▀▀▀▀▀▀▘{BLUE}▝██  {CYAN}▟█▖       {CYAN}  {BLUE}Kernel{RESET}        {kernel_version}
+ {BLUE}     ▟█▛       {BLUE}▝█▘{CYAN}▟█▛        {CYAN}  {BLUE}Uptime{RESET}        {uptime}
+ {BLUE}▟█████▛          {CYAN}▟█████▛     {CYAN}  {BLUE}WM{RESET}            {window_manager}
+ {BLUE}   ▟█▛{CYAN}▗█▖       {CYAN}▟█▛          {CYAN}󰍛  {BLUE}Memory{RESET}        {memory_usage}
+ {BLUE}  ▝█▛  {CYAN}██▖{BLUE}▗▄▄▄▄▄▄▄▄▄▄▄       {CYAN}󱥎  {BLUE}Storage (/){RESET}   {storage}
+ {BLUE}   ▝  {CYAN}▟█▜█▖{BLUE}▀▀▀▀▀██▛▀▀▘              
+ {CYAN}     ▟█▘ ▜█▖    {BLUE}▝█▛                 
     "
     );
 }
