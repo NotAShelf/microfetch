@@ -1,3 +1,4 @@
+use color_eyre::Result;
 use std::{env, io};
 
 pub fn get_desktop_info() -> Result<String, io::Error> {

@@ -1,3 +1,4 @@
+use color_eyre::Result;
 use nix::sys::statvfs::statvfs;
 use nix::sys::sysinfo::SysInfo;
 
