@@ -1,6 +1,6 @@
 [package]
 name = "microfetch"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 
 [dependencies]
@@ -9,7 +9,6 @@ color-eyre = { version = "0.6", default-features = false }
 
 [profile.dev]
 opt-level = 3
-
 
 [profile.release]
 strip = true
