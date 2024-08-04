@@ -7,9 +7,19 @@ edition = "2021"
 nix = {version = "0.29", features = ["fs", "hostname"]}
 color-eyre = { version = "0.6", default-features = false }
 
+[profile.dev]
+opt-level = 3
+
+
 [profile.release]
 strip = true
 opt-level = "z"
 lto = true
 codegen-units = 1
 panic = "abort"
+
+[profile.profiler]
+inherits = "release"
+debug = true
+split-debuginfo = "unpacked"
+strip = "none"
