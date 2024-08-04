@@ -1,21 +1,10 @@
-use std::fs::File;
-use std::io::{self, BufRead, BufReader};
-use std::path::Path;
+use color_eyre::Result;
+use nix::sys::sysinfo::sysinfo;
+use std::io;
 
 pub fn get_current() -> Result<String, io::Error> {
-    let path = Path::new("/proc/uptime");
-    let file = File::open(path)?;
-    let mut reader = BufReader::new(file);
-
-    let mut line = String::new();
-    reader.read_line(&mut line)?;
-
-    let uptime_seconds: f64 = line
-        .split_whitespace()
-        .next()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Failed to parse uptime"))?
-        .parse()
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let info = sysinfo().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    let uptime_seconds = info.uptime().as_secs_f64();
 
     let total_minutes = (uptime_seconds / 60.0).round() as u64;
     let days = total_minutes / (60 * 24);
