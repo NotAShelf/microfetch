@@ -15,13 +15,10 @@ pub fn get_username_and_hostname() -> Result<String, io::Error> {
 }
 
 pub fn get_shell() -> Result<String, io::Error> {
-    // In some setups, $SHELL is set to the store path
-    // of the actual shell program. While we can consider
-    // trimming by name, I will leave it to the user to handle
-    // what their SHELL variable is really set to.
-    let shell = env::var("SHELL").unwrap_or_else(|_| "unknown_shell".to_string());
+    let shell_path = env::var("SHELL").unwrap_or_else(|_| "unknown_shell".to_string());
+    let shell_name = shell_path.rsplit('/').next().unwrap_or("unknown_shell");
 
-    Ok(shell)
+    Ok(shell_name.to_string())
 }
 
 pub fn get_root_disk_usage() -> Result<String, io::Error> {
