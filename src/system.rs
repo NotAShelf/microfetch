@@ -14,6 +14,16 @@ pub fn get_username_and_hostname() -> Result<String, io::Error> {
     Ok(format!("{YELLOW}{username}{RED}@{GREEN}{hostname}"))
 }
 
+pub fn get_shell() -> Result<String, io::Error> {
+    // In some setups, $SHELL is set to the store path
+    // of the actual shell program. While we can consider
+    // trimming by name, I will leave it to the user to handle
+    // what their SHELL variable is really set to.
+    let shell = env::var("SHELL").unwrap_or_else(|_| "unknown_shell".to_string());
+
+    Ok(shell)
+}
+
 pub fn get_root_disk_usage() -> Result<String, io::Error> {
     let vfs = statvfs("/")?;
     let block_size = vfs.block_size() as u64;
