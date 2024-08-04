@@ -1,38 +1,27 @@
 use color_eyre::Result;
 use std::fs::{self, read_to_string};
-use std::io::{self, Read};
+use std::io;
 
 // Try to detect OS type as accurately as possible and without depending on uname.
 // /etc/os-release should generally imply Linux, and /etc/bsd-release would imply BSD system.
-fn detect_os() -> Result<String, io::Error> {
+fn detect_os() -> Result<&'static str, io::Error> {
     if fs::metadata("/etc/os-release").is_ok() || fs::metadata("/usr/lib/os-release").is_ok() {
-        Ok("Linux".to_string())
+        Ok("Linux")
     } else if fs::metadata("/etc/rc.conf").is_ok() || fs::metadata("/etc/bsd-release").is_ok() {
-        Ok("BSD".to_string())
+        Ok("BSD")
     } else {
-        Ok("Unknown".to_string())
+        Ok("Unknown")
     }
-}
-
-fn get_architecture() -> Result<String, io::Error> {
-    // Read architecture from /proc/sys/kernel/arch
-    let mut arch = String::new();
-    fs::File::open("/proc/sys/kernel/arch")?.read_to_string(&mut arch)?;
-    let arch = arch.trim().to_string();
-    Ok(arch)
 }
 
 pub fn get_system_info() -> Result<String, io::Error> {
     let system = detect_os()?;
 
-    let mut kernel_release = String::new();
-    fs::File::open("/proc/sys/kernel/osrelease")?.read_to_string(&mut kernel_release)?;
-    let kernel_release = kernel_release.trim().to_string();
+    let kernel_release = read_to_string("/proc/sys/kernel/osrelease")?;
+    let kernel_release = kernel_release.trim();
 
-    let mut cpuinfo = String::new();
-    fs::File::open("/proc/cpuinfo")?.read_to_string(&mut cpuinfo)?;
-
-    let architecture = get_architecture()?;
+    let architecture = read_to_string("/proc/sys/kernel/arch")?;
+    let architecture = architecture.trim();
 
     let result = format!("{system} {kernel_release} ({architecture})");
     Ok(result)

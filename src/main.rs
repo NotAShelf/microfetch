@@ -4,7 +4,7 @@ mod release;
 mod system;
 mod uptime;
 
-use color_eyre::{Report, Result};
+use nix::sys::sysinfo::sysinfo;
 
 use crate::colors::{BLUE, CYAN, RESET};
 use crate::desktop::get_desktop_info;
@@ -32,8 +32,6 @@ fn main() -> Result<(), Report> {
         &memory_usage,
         &storage,
     );
-
-    Ok(())
 }
 
 fn print_system_info(

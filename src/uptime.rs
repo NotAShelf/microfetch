@@ -25,7 +25,7 @@ pub fn get_current() -> Result<String, io::Error> {
     let hours = (total_minutes % (60 * 24)) / 60;
     let minutes = total_minutes % 60;
 
-    let mut parts = Vec::new();
+    let mut parts = Vec::with_capacity(3);
     if days > 0 {
         parts.push(format!("{days} days"));
     }
