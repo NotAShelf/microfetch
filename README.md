@@ -1,11 +1,25 @@
-# Microfetch
+<div align="center">
+    <img src="https://deps.rs/repo/github/notashelf/microfetch/status.svg" alt="https://deps.rs/repo/github/notashelf/microfetch">
+    <!-- <img src="https://img.shields.io/github/v/release/notashelf/microfetch?display_name=tag&color=DEA584"> -->
+    <img src="https://img.shields.io/github/stars/notashelf/microfetch?label=stars&color=DEA584">
+</div>
 
-A stupidly simple fetch tool, written in Rust. Runs in a fraction of a second,
-displays most nonsense people on r/unixporn care about. Aims to replace
-fastfetch on my system, but probably not on yours. Though you are more than
-welcome to use it on your system: it's fast.
+<h1 align="center">Microfetch</h1>
 
-![Demo](.github/assets/demo.png)
+Stupidly simple, laughably fast fetch tool. Written in Rust for speed and ease
+of maintainability. Runs in a _fraction of a millisecond_ and displays _most_ of
+the nonsense you'd see posted on r/unixporn or other internet communities. Aims
+to replace [fastfetch](https://github.com/fastfetch-cli/fastfetch) on my
+personal system, but [probably not yours](#customizing). Though, you are more
+than welcome to use it on your system: it's pretty [fast...](#benchmarks)
+
+<p align="center">
+  <img
+    alt="latest demo"
+    src="./.github/assets/demo.png"
+    width="850px"
+  >
+</p>
 
 ## Features
 
@@ -20,7 +34,7 @@ welcome to use it on your system: it's fast.
     - Name
     - Version
     - Architecture
-  - Current shell (from $SHELL)
+  - Current shell (from $SHELL, trimmed if store path)
   - WM/Compositor and display backend
   - Memory Usage/Total Memory
   - Storage Usage/Total Storage (for `/` only)
@@ -33,12 +47,17 @@ Microfetch's performance is mostly hardware-dependant, however, the overall
 trend seems to be < 2ms on any modern (2015 and after) CPU. Below are the
 benchmarks with Hyperfine on my desktop system.
 
-| Command                     | Mean [ms] | Min [ms] | Max [ms] | Relative |
-| :-------------------------- | --------: | -------: | -------: | -------: |
-| `target/release/microfetch` | 1.3 ± 0.1 |      1.2 |      3.7 |     1.00 |
+| Command      |   Mean [ms] | Min [ms] | Max [ms] |       Relative |
+| :----------- | ----------: | -------: | -------: | -------------: |
+| `microfetch` |   1.3 ± 0.0 |      1.3 |      1.4 |           1.00 |
+| `pfetch`     | 254.2 ± 4.8 |    246.7 |    264.9 |  191.97 ± 7.10 |
+| `neofetch`   | 735.4 ± 9.5 |    721.1 |    752.8 | 555.48 ± 19.08 |
+| `fastfetch`  |  31.9 ± 0.8 |     30.8 |     33.8 |   24.08 ± 0.98 |
 
-On an average configuration, this is roughly 25 times faster than fastfetch and
-around 80 times faster than neofetch. Results, as stated above, may vary.
+_As far as I'm concerned, Microfetch is faster than almost every fetch tool
+there is. The only downside of using Rust is introducing more "bloated"
+dependency trees and increasing build times. The latter is easily mitigated with
+Nix's binary cache, though._
 
 ## Customizing
 
@@ -63,6 +82,14 @@ general rule of thumb consider talking to me before creating a feature PR.
 
 Contributions that help improve performance in specific areas of Microfetch are
 welcome. Though, prepare to be bombarded with questions.
+
+## Hacking
+
+A Nix flake is provided. `nix develop` to get started. Direnv users may simply
+run `direnv allow` to get started.
+
+Non-nix users will need `cargo` and `gcc` installed on their system, see
+`Cargo.toml` for available release profiles.
 
 ## License
 
