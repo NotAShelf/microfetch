@@ -16,43 +16,40 @@ use nix::sys::sysinfo::sysinfo;
 fn main() -> Result<(), Report> {
     color_eyre::install()?;
 
-    let user_info = get_username_and_hostname()?;
-    let os_name = get_os_pretty_name()?;
-    let kernel_version = get_system_info()?;
-    let shell = get_shell()?;
-    let uptime = get_current()?;
-    let window_manager = get_desktop_info()?;
-    let sys_info = sysinfo()?;
-    let memory_usage = get_memory_usage(sys_info);
-    let storage = get_root_disk_usage()?;
-    let colors = print_dots()?;
+    let fields = Fields {
+        user_info: get_username_and_hostname()?,
+        os_name: get_os_pretty_name()?,
+        kernel_version: get_system_info()?,
+        shell: get_shell()?,
+        uptime: get_current()?,
+        window_manager: get_desktop_info()?,
+        memory_usage: get_memory_usage(sysinfo()?),
+        storage: get_root_disk_usage()?,
+        colors: print_dots()?,
+    };
 
-    print_system_info(
-        &user_info,
-        &os_name,
-        &kernel_version,
-        &shell,
-        &uptime,
-        &window_manager,
-        &memory_usage,
-        &storage,
-        &colors,
-    );
+    print_system_info(&fields);
 
     Ok(())
 }
 
-fn print_system_info(
-    user_info: &str,
-    os_name: &str,
-    kernel_version: &str,
-    shell: &str,
-    uptime: &str,
-    window_manager: &str,
-    memory_usage: &str,
-    storage: &str,
-    colors: &str,
-) {
+// Struct to hold all the fields we need to print
+// helps avoid clippy warnings about argument count
+// and makes it easier to pass around, though its
+// not like we need to
+struct Fields {
+    user_info: String,
+    os_name: String,
+    kernel_version: String,
+    shell: String,
+    uptime: String,
+    window_manager: String,
+    memory_usage: String,
+    storage: String,
+    colors: String,
+}
+
+fn print_system_info(fields: &Fields) {
     println!(
         "
  {CYAN}     ▟█▖    {BLUE}▝█▙ ▗█▛          {user_info} ~{RESET}
@@ -64,6 +61,15 @@ fn print_system_info(
  {BLUE}  ▝█▛  {CYAN}██▖{BLUE}▗▄▄▄▄▄▄▄▄▄▄▄       {CYAN}󰍛  {BLUE}Memory{RESET}        {memory_usage}
  {BLUE}   ▝  {CYAN}▟█▜█▖{BLUE}▀▀▀▀▀██▛▀▀▘       {CYAN}󱥎  {BLUE}Storage (/){RESET}   {storage}
  {CYAN}     ▟█▘ ▜█▖    {BLUE}▝█▛          {CYAN}  {BLUE}Colors{RESET}        {colors}
-    "
+",
+        user_info = fields.user_info,
+        os_name = fields.os_name,
+        kernel_version = fields.kernel_version,
+        shell = fields.shell,
+        uptime = fields.uptime,
+        window_manager = fields.window_manager,
+        memory_usage = fields.memory_usage,
+        storage = fields.storage,
+        colors = fields.colors,
     );
 }
