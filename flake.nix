@@ -13,5 +13,9 @@
     packages = forEachSystem (system: {
       default = pkgsForEach.${system}.callPackage ./nix/package.nix {};
     });
+
+    devShells = forEachSystem (system: {
+      default = pkgsForEach.${system}.callPackage ./nix/shell.nix {};
+    });
   };
 }
