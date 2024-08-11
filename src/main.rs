@@ -9,6 +9,7 @@ use crate::desktop::get_desktop_info;
 use crate::release::{get_os_pretty_name, get_system_info};
 use crate::system::{get_memory_usage, get_root_disk_usage, get_shell, get_username_and_hostname};
 use crate::uptime::get_current;
+use std::io;
 
 use color_eyre::Report;
 use nix::sys::sysinfo::sysinfo;
@@ -16,14 +17,15 @@ use nix::sys::sysinfo::sysinfo;
 fn main() -> Result<(), Report> {
     color_eyre::install()?;
 
+    let info = sysinfo().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     let fields = Fields {
         user_info: get_username_and_hostname()?,
         os_name: get_os_pretty_name()?,
         kernel_version: get_system_info()?,
         shell: get_shell()?,
-        uptime: get_current()?,
+        uptime: get_current(&info)?,
         window_manager: get_desktop_info()?,
-        memory_usage: get_memory_usage(sysinfo()?),
+        memory_usage: get_memory_usage(&info),
         storage: get_root_disk_usage()?,
         colors: print_dots()?,
     };
