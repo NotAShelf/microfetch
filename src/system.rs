@@ -40,9 +40,9 @@ pub fn get_root_disk_usage() -> Result<String, io::Error> {
     ))
 }
 
-pub fn get_memory_usage(info: SysInfo) -> String {
+pub fn get_memory_usage(info: &SysInfo) -> String {
     #[inline(always)]
-    fn parse_memory_info(info: SysInfo) -> (f64, f64) {
+    fn parse_memory_info(info: &SysInfo) -> (f64, f64) {
         let total_memory_kb = (info.ram_total() / 1024) as f64;
         let available_memory_kb = (info.ram_unused() / 1024) as f64;
 
