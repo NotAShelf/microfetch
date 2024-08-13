@@ -22,7 +22,7 @@ fn main() -> Result<(), Report> {
         kernel_version: get_system_info()?,
         shell: get_shell(),
         uptime: get_current()?,
-        window_manager: get_desktop_info(),
+        desktop: get_desktop_info(),
         memory_usage: get_memory_usage(sysinfo()?),
         storage: get_root_disk_usage()?,
         colors: print_dots(),
@@ -43,7 +43,7 @@ struct Fields {
     kernel_version: String,
     shell: String,
     uptime: String,
-    window_manager: String,
+    desktop: String,
     memory_usage: String,
     storage: String,
     colors: String,
@@ -56,7 +56,7 @@ fn print_system_info(fields: &Fields) {
         kernel_version,
         shell,
         uptime,
-        window_manager,
+        desktop,
         memory_usage,
         storage,
         colors,
@@ -69,7 +69,7 @@ fn print_system_info(fields: &Fields) {
  {CYAN}  ▀▀▀▀▀▀▀▀▀▀▀▘{BLUE}▝██  {CYAN}▟█▖       {CYAN}  {BLUE}Kernel{RESET}        {kernel_version}
  {BLUE}     ▟█▛       {BLUE}▝█▘{CYAN}▟█▛        {CYAN}  {BLUE}Shell{RESET}         {shell}
  {BLUE}▟█████▛          {CYAN}▟█████▛     {CYAN}  {BLUE}Uptime{RESET}        {uptime}
- {BLUE}   ▟█▛{CYAN}▗█▖       {CYAN}▟█▛          {CYAN}  {BLUE}WM{RESET}            {window_manager}
+ {BLUE}   ▟█▛{CYAN}▗█▖       {CYAN}▟█▛          {CYAN}  {BLUE}Desktop{RESET}       {desktop}
  {BLUE}  ▝█▛  {CYAN}██▖{BLUE}▗▄▄▄▄▄▄▄▄▄▄▄       {CYAN}󰍛  {BLUE}Memory{RESET}        {memory_usage}
  {BLUE}   ▝  {CYAN}▟█▜█▖{BLUE}▀▀▀▀▀██▛▀▀▘       {CYAN}󱥎  {BLUE}Storage (/){RESET}   {storage}
  {CYAN}     ▟█▘ ▜█▖    {BLUE}▝█▛          {CYAN}  {BLUE}Colors{RESET}        {colors}");

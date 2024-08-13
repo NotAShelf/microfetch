@@ -1,17 +1,35 @@
 pub fn get_desktop_info() -> String {
+    fn capitalize_first_letter(s: &str) -> String {
+        if s.is_empty() {
+            return String::new();
+        }
+
+        let mut chars = s.chars();
+        let first_char = chars.next().unwrap().to_uppercase().to_string();
+        let rest: String = chars.collect();
+        first_char + &rest
+    }
+
+    // Retrieve the environment variables and handle Result types
     let desktop_env = std::env::var("XDG_CURRENT_DESKTOP");
-    let display_backend = std::env::var("XDG_SESSION_TYPE");
+    let display_backend_result = std::env::var("XDG_SESSION_TYPE");
+
+    // Capitalize the first letter of the display backend value
+    let display_backend = capitalize_first_letter(display_backend_result.as_deref().unwrap_or(""));
 
     // Trim "none+" from the start of desktop_env if present
-    // XXX: This is a workaround for NixOS modules that set XDG_CURRENT_DESKTOP to "none+foo"
-    // instead of just "foo"
-    // Use "Unknown" if desktop_env or display_backend is empty
-    let desktop_env = match desktop_env.as_ref() {
-        Err(_) => "Unknown",
-        Ok(s) => s.trim_start_matches("none+"),
+    // Use "Unknown" if desktop_env is empty or has an error
+    let desktop_env = match desktop_env {
+        Err(_) => "Unknown".to_string(),
+        Ok(s) => s.trim_start_matches("none+").to_string(),
     };
 
-    let display_backend = display_backend.unwrap_or(String::from("Unknown"));
+    // Handle the case where display_backend might be empty after capitalization
+    let display_backend = if display_backend.is_empty() {
+        "Unknown".to_string()
+    } else {
+        display_backend
+    };
 
     format!("{desktop_env} ({display_backend})")
 }
