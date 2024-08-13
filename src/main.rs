@@ -11,7 +11,6 @@ use crate::system::{get_memory_usage, get_root_disk_usage, get_shell, get_userna
 use crate::uptime::get_current;
 
 use color_eyre::Report;
-use nix::sys::sysinfo::sysinfo;
 
 fn main() -> Result<(), Report> {
     color_eyre::install()?;
@@ -23,7 +22,7 @@ fn main() -> Result<(), Report> {
         shell: get_shell()?,
         uptime: get_current()?,
         window_manager: get_desktop_info()?,
-        memory_usage: get_memory_usage(sysinfo()?),
+        memory_usage: get_memory_usage()?,
         storage: get_root_disk_usage()?,
         colors: print_dots()?,
     };

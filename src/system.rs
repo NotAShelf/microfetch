@@ -1,11 +1,11 @@
 use color_eyre::Result;
 use nix::sys::statvfs::statvfs;
-use nix::sys::sysinfo::SysInfo;
-
-use std::env;
-use std::io::{self};
+use std::fs::File;
+use std::io::{self, BufRead};
+use std::path::Path;
 
 use crate::colors::{CYAN, GREEN, RED, RESET, YELLOW};
+use std::env;
 
 pub fn get_username_and_hostname() -> Result<String, io::Error> {
     let username = env::var("USER").unwrap_or_else(|_| "unknown_user".to_string());
@@ -40,21 +40,38 @@ pub fn get_root_disk_usage() -> Result<String, io::Error> {
     ))
 }
 
-pub fn get_memory_usage(info: SysInfo) -> String {
+pub fn get_memory_usage() -> Result<String, io::Error> {
     #[inline(always)]
-    fn parse_memory_info(info: SysInfo) -> (f64, f64) {
-        let total_memory_kb = (info.ram_total() / 1024) as f64;
-        let available_memory_kb = (info.ram_unused() / 1024) as f64;
+    fn parse_memory_info() -> Result<(f64, f64), io::Error> {
+        let path = Path::new("/proc/meminfo");
+        let file = File::open(&path)?;
+        let reader = io::BufReader::new(file);
 
-        let total_memory_gb = total_memory_kb / (1024.0 * 1024.0);
-        let available_memory_gb = available_memory_kb / (1024.0 * 1024.0);
-        let used_memory_gb = total_memory_gb - available_memory_gb;
+        let mut meminfo = std::collections::HashMap::new();
 
-        (used_memory_gb, total_memory_gb)
+        for line in reader.lines() {
+            let line = line?;
+            let mut parts = line.split_whitespace();
+            if let (Some(key), Some(value), Some(_)) = (parts.next(), parts.next(), parts.next()) {
+                let key = key.trim_end_matches(':');
+                let value: u64 = value.parse().unwrap_or(0);
+                meminfo.insert(key.to_string(), value);
+            }
+        }
+
+        let total_memory = meminfo["MemTotal"];
+        let used_memory = total_memory - meminfo["MemAvailable"];
+
+        let used_memory_gb = used_memory as f64 / (1024.0 * 1024.0);
+        let total_memory_gb = total_memory as f64 / (1024.0 * 1024.0);
+
+        Ok((used_memory_gb, total_memory_gb))
     }
 
-    let (used_memory, total_memory) = parse_memory_info(info);
+    let (used_memory, total_memory) = parse_memory_info()?;
     let percentage_used = (used_memory / total_memory * 100.0).round() as u64;
 
-    format!("{used_memory:.2} GiB / {total_memory:.2} GiB ({CYAN}{percentage_used}%{RESET})")
+    Ok(format!(
+        "{used_memory:.2} GiB / {total_memory:.2} GiB ({CYAN}{percentage_used}%{RESET})"
+    ))
 }
