@@ -23,5 +23,5 @@ pub fn get_os_pretty_name() -> Result<String, io::Error> {
                 .to_string()
         });
 
-    Ok(pretty_name.unwrap_or_else(|| "Unknown".to_string()))
+    Ok(pretty_name.unwrap_or("Unknown".to_string()))
 }
