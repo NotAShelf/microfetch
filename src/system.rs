@@ -7,19 +7,19 @@ use std::io::{self};
 
 use crate::colors::{CYAN, GREEN, RED, RESET, YELLOW};
 
-pub fn get_username_and_hostname() -> Result<String, io::Error> {
-    let username = env::var("USER").unwrap_or_else(|_| "unknown_user".to_string());
-    let hostname = nix::unistd::gethostname()?;
+pub fn get_username_and_hostname() -> String {
+    let username = env::var("USER").unwrap_or("unknown_user".to_string());
+    let hostname = nix::unistd::gethostname().unwrap_or("unknown_host".to_string().into());
     let hostname = hostname.to_string_lossy();
 
-    Ok(format!("{YELLOW}{username}{RED}@{GREEN}{hostname}"))
+    format!("{YELLOW}{username}{RED}@{GREEN}{hostname}")
 }
 
-pub fn get_shell() -> Result<String, io::Error> {
-    let shell_path = env::var("SHELL").unwrap_or_else(|_| "unknown_shell".to_string());
+pub fn get_shell() -> String {
+    let shell_path = env::var("SHELL").unwrap_or("unknown_shell".to_string());
     let shell_name = shell_path.rsplit('/').next().unwrap_or("unknown_shell");
 
-    Ok(shell_name.to_string())
+    shell_name.to_string()
 }
 
 pub fn get_root_disk_usage() -> Result<String, io::Error> {

@@ -6,8 +6,6 @@ pub const YELLOW: &str = "\x1b[33m";
 pub const RED: &str = "\x1b[31m";
 pub const MAGENTA: &str = "\x1b[35m";
 
-pub fn print_dots() -> Result<String, std::io::Error> {
-    let colors = format!("{BLUE}  {CYAN}  {GREEN}  {YELLOW}  {RED}  {MAGENTA}  {RESET}");
-
-    Ok(colors)
+pub fn print_dots() -> String {
+    format!("{BLUE}  {CYAN}  {GREEN}  {YELLOW}  {RED}  {MAGENTA}  {RESET}")
 }
