@@ -47,12 +47,12 @@ Microfetch's performance is mostly hardware-dependant, however, the overall
 trend seems to be < 2ms on any modern (2015 and after) CPU. Below are the
 benchmarks with Hyperfine on my desktop system.
 
-| Command      |   Mean [ms] | Min [ms] | Max [ms] |       Relative |
-| :----------- | ----------: | -------: | -------: | -------------: |
-| `microfetch` |   1.3 ± 0.0 |      1.3 |      1.4 |           1.00 |
-| `pfetch`     | 254.2 ± 4.8 |    246.7 |    264.9 |  191.97 ± 7.10 |
-| `neofetch`   | 735.4 ± 9.5 |    721.1 |    752.8 | 555.48 ± 19.08 |
-| `fastfetch`  |  31.9 ± 0.8 |     30.8 |     33.8 |   24.08 ± 0.98 |
+| Command      |   Mean [ms] | Min [ms] | Max [ms] |       Relative | Written by raf? |
+| :----------- | ----------: | -------: | -------: | -------------: | ----------------:
+| `microfetch` |   1.3 ± 0.0 |      1.3 |      1.4 |           1.00 |             yes |
+| `pfetch`     | 254.2 ± 4.8 |    246.7 |    264.9 |  191.97 ± 7.10 |              no |
+| `neofetch`   | 735.4 ± 9.5 |    721.1 |    752.8 | 555.48 ± 19.08 |              no |
+| `fastfetch`  |  31.9 ± 0.8 |     30.8 |     33.8 |   24.08 ± 0.98 |              no |
 
 _As far as I'm concerned, Microfetch is faster than almost every fetch tool
 there is. The only downside of using Rust is introducing more "bloated"
