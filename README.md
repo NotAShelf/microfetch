@@ -35,11 +35,22 @@ than welcome to use it on your system: it's pretty [fast...](#benchmarks)
     - Version
     - Architecture
   - Current shell (from $SHELL, trimmed if store path)
-  - WM/Compositor and display backend
+  - Current Desktop (DE/WM/Compositor and display backend)
   - Memory Usage/Total Memory
   - Storage Usage/Total Storage (for `/` only)
   - Shell Colors
 - Did I mention fast?
+
+## Installation
+
+Microfetch is packaged in [nixpkgs](https://github.com/nixos/nixpkgs). You can
+get it through the unstable channel for the time being. The Nix flake can also
+be used for bleeding-edge builds.
+
+Non-Nix users will have to build Microfetch with `cargo`.
+
+Microfetch is _currently_ not available anywhere else. Though, does it _really_
+have to be?
 
 ## Benchmarks
 
@@ -48,7 +59,7 @@ trend seems to be < 2ms on any modern (2015 and after) CPU. Below are the
 benchmarks with Hyperfine on my desktop system.
 
 | Command      |   Mean [ms] | Min [ms] | Max [ms] |       Relative | Written by raf? |
-| :----------- | ----------: | -------: | -------: | -------------: | ----------------:
+| :----------- | ----------: | -------: | -------: | -------------: | --------------: |
 | `microfetch` |   1.3 ± 0.0 |      1.3 |      1.4 |           1.00 |             yes |
 | `pfetch`     | 254.2 ± 4.8 |    246.7 |    264.9 |  191.97 ± 7.10 |              no |
 | `neofetch`   | 735.4 ± 9.5 |    721.1 |    752.8 | 555.48 ± 19.08 |              no |
