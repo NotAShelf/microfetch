@@ -1,15 +1,21 @@
 use color_eyre::Result;
-use nix::sys::statvfs::statvfs;
+use nix::sys::{statvfs::statvfs, utsname::UtsName};
 
-use std::env;
-use std::io::{self};
+use std::{
+    env,
+    fs::File,
+    io::{self, Read},
+};
 
 use crate::colors::{CYAN, GREEN, RED, RESET, YELLOW};
 
-pub fn get_username_and_hostname() -> String {
+pub fn get_username_and_hostname(utsname: &UtsName) -> String {
     let username = env::var("USER").unwrap_or("unknown_user".to_string());
-    let hostname = nix::unistd::gethostname().unwrap_or("unknown_host".to_string().into());
-    let hostname = hostname.to_string_lossy();
+    let hostname = utsname
+        .nodename()
+        .to_str()
+        .unwrap_or("unknown_host")
+        .to_string();
 
     format!("{YELLOW}{username}{RED}@{GREEN}{hostname}")
 }
@@ -45,13 +51,20 @@ pub fn get_memory_usage() -> Result<String, io::Error> {
         let mut total_memory_kb = 0.0;
         let mut available_memory_kb = 0.0;
 
-        for line in std::fs::read_to_string("/proc/meminfo")?.lines() {
+        let mut meminfo = String::with_capacity(2048);
+        File::open("/proc/meminfo")?.read_to_string(&mut meminfo)?;
+
+        for line in meminfo.lines() {
             let mut split = line.split_whitespace();
-            let key = split.next().unwrap_or("");
-            if key == "MemTotal:" {
-                total_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0);
-            } else if key == "MemAvailable:" {
-                available_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0);
+            match split.next().unwrap_or_default() {
+                "MemTotal:" => total_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0),
+                "MemAvailable:" => {
+                    available_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0);
+
+                    // MemTotal comes before MemAvailable, stop parsing
+                    break;
+                }
+                _ => (),
             }
         }
 
