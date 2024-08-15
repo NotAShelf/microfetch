@@ -70,11 +70,12 @@ there is. The only downside of using Rust is introducing more "bloated"
 dependency trees and increasing build times. The latter is easily mitigated with
 Nix's binary cache, though._
 
- To benchmark individual functions,
-[Criterion.rs](https://github.com/bheisler/criterion.rs) is used. See their 
-[Getting Started Guide](https://bheisler.github.io/criterion.rs/book/getting_started.html)
-for details or just run `cargo bench` to benchmark everything.
+[Criterion.rs]: https://github.com/bheisler/criterion.rs
+[Getting Started Guide]: https://bheisler.github.io/criterion.rs/book/getting_started.html
 
+To benchmark individual functions, [Criterion.rs] is used. See Criterion's
+[Getting Started Guide] for details or just run `cargo bench` to benchmark
+all features of Microfetch
 ## Customizing
 
 You can't\*.
