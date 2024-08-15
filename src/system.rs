@@ -48,10 +48,16 @@ pub fn get_memory_usage() -> Result<String, io::Error> {
         for line in std::fs::read_to_string("/proc/meminfo")?.lines() {
             let mut split = line.split_whitespace();
             let key = split.next().unwrap_or("");
-            if key == "MemTotal:" {
-                total_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0);
-            } else if key == "MemAvailable:" {
-                available_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0);
+
+            match key {
+                "MemTotal:" => total_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0),
+                "MemAvailable:" => {
+                    available_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0);
+
+                    // MemTotal comes before MemAvailable, stop parsing
+                    break;
+                }
+                _ => (),
             }
         }
 
