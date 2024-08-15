@@ -7,7 +7,7 @@ use microfetch_lib::system::{
 };
 use microfetch_lib::uptime::get_current;
 
-fn benchmark1(c: &mut Criterion) {
+fn main_benchmark(c: &mut Criterion) {
     let utsname = nix::sys::utsname::uname().expect("lol");
     c.bench_function("user_info", |b| {
         b.iter(|| get_username_and_hostname(&utsname))
@@ -23,5 +23,5 @@ fn benchmark1(c: &mut Criterion) {
     c.bench_function("colors", |b| b.iter(print_dots));
 }
 
-criterion_group!(benches, benchmark1);
+criterion_group!(benches, main_benchmark);
 criterion_main!(benches);
