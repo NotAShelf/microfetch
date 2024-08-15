@@ -72,7 +72,7 @@ Nix's binary cache, though._
 
 ## Customizing
 
-You can't.
+You can't\*.
 
 ### Why?
 
@@ -101,6 +101,11 @@ run `direnv allow` to get started.
 
 Non-nix users will need `cargo` and `gcc` installed on their system, see
 `Cargo.toml` for available release profiles.
+
+## Thanks
+
+Huge thanks to everyone who took the time to make pull requests or nag me in
+person about current issues.
 
 ## License
 
