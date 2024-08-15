@@ -3,9 +3,24 @@ name = "microfetch"
 version = "0.3.5"
 edition = "2021"
 
+[lib]
+name = "microfetch_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "microfetch"
+path = "src/main.rs"
+
 [dependencies]
 nix = { version = "0.29", features = ["fs", "hostname", "feature"] }
 color-eyre = { version = "0.6", default-features = false }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "benchmark"
+harness = false
 
 [profile.dev]
 opt-level = 3
