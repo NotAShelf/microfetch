@@ -8,7 +8,7 @@ name = "microfetch_lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "microfetch_bin"
+name = "microfetch"
 path = "src/main.rs"
 
 [dependencies]
