@@ -1,6 +1,5 @@
 use color_eyre::Result;
 use nix::sys::statvfs::statvfs;
-use nix::sys::sysinfo::SysInfo;
 
 use std::env;
 use std::io::{self};
@@ -40,21 +39,33 @@ pub fn get_root_disk_usage() -> Result<String, io::Error> {
     ))
 }
 
-pub fn get_memory_usage(info: &SysInfo) -> String {
+pub fn get_memory_usage() -> Result<String, io::Error> {
     #[inline(always)]
-    fn parse_memory_info(info: &SysInfo) -> (f64, f64) {
-        let total_memory_kb = (info.ram_total() / 1024) as f64;
-        let available_memory_kb = (info.ram_unused() / 1024) as f64;
+    fn parse_memory_info() -> Result<(f64, f64), io::Error> {
+        let mut total_memory_kb = 0.0;
+        let mut available_memory_kb = 0.0;
 
-        let total_memory_gb = total_memory_kb / (1024.0 * 1024.0);
-        let available_memory_gb = available_memory_kb / (1024.0 * 1024.0);
+        for line in std::fs::read_to_string("/proc/meminfo")?.lines() {
+            let mut split = line.split_whitespace();
+            let key = split.next().unwrap_or("");
+            if key == "MemTotal:" {
+                total_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0);
+            } else if key == "MemAvailable:" {
+                available_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0);
+            }
+        }
+
+        let total_memory_gb = total_memory_kb / 1024.0 / 1024.0;
+        let available_memory_gb = available_memory_kb / 1024.0 / 1024.0;
         let used_memory_gb = total_memory_gb - available_memory_gb;
 
-        (used_memory_gb, total_memory_gb)
+        Ok((used_memory_gb, total_memory_gb))
     }
 
-    let (used_memory, total_memory) = parse_memory_info(info);
+    let (used_memory, total_memory) = parse_memory_info()?;
     let percentage_used = (used_memory / total_memory * 100.0).round() as u64;
 
-    format!("{used_memory:.2} GiB / {total_memory:.2} GiB ({CYAN}{percentage_used}%{RESET})")
+    Ok(format!(
+        "{used_memory:.2} GiB / {total_memory:.2} GiB ({CYAN}{percentage_used}%{RESET})"
+    ))
 }

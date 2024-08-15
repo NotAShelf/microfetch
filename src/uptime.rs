@@ -1,8 +1,9 @@
 use color_eyre::Result;
-use nix::sys::sysinfo::SysInfo;
+use nix::sys::sysinfo::sysinfo;
 use std::io;
 
-pub fn get_current(info: &SysInfo) -> Result<String, io::Error> {
+pub fn get_current() -> Result<String, io::Error> {
+    let info = sysinfo().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     let uptime_seconds = info.uptime().as_secs_f64();
 
     let total_minutes = (uptime_seconds / 60.0).round() as u64;
