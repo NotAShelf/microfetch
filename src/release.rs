@@ -1,6 +1,8 @@
 use color_eyre::Result;
-use std::fs::read_to_string;
-use std::io;
+use std::{
+    fs::File,
+    io::{self, Read},
+};
 
 pub fn get_system_info() -> nix::Result<String> {
     let utsname = nix::sys::utsname::uname()?;
@@ -13,7 +15,9 @@ pub fn get_system_info() -> nix::Result<String> {
 }
 
 pub fn get_os_pretty_name() -> Result<String, io::Error> {
-    let os_release_content = read_to_string("/etc/os-release")?;
+    let mut os_release_content = String::with_capacity(1024);
+    File::open("/etc/os-release")?.read_to_string(&mut os_release_content)?;
+
     let pretty_name = os_release_content
         .lines()
         .find(|line| line.starts_with("PRETTY_NAME="))

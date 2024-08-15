@@ -1,8 +1,11 @@
 use color_eyre::Result;
 use nix::sys::statvfs::statvfs;
 
-use std::env;
-use std::io::{self};
+use std::{
+    env,
+    fs::File,
+    io::{self, Read},
+};
 
 use crate::colors::{CYAN, GREEN, RED, RESET, YELLOW};
 
@@ -45,7 +48,10 @@ pub fn get_memory_usage() -> Result<String, io::Error> {
         let mut total_memory_kb = 0.0;
         let mut available_memory_kb = 0.0;
 
-        for line in std::fs::read_to_string("/proc/meminfo")?.lines() {
+        let mut meminfo = String::with_capacity(2048);
+        File::open("/proc/meminfo")?.read_to_string(&mut meminfo)?;
+
+        for line in meminfo.lines() {
             let mut split = line.split_whitespace();
             let key = split.next().unwrap_or("");
 
