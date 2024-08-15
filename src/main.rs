@@ -4,6 +4,8 @@ mod release;
 mod system;
 mod uptime;
 
+use std::io::Write;
+
 use crate::colors::{print_dots, BLUE, CYAN, RESET};
 use crate::desktop::get_desktop_info;
 use crate::release::{get_os_pretty_name, get_system_info};
@@ -61,7 +63,7 @@ fn print_system_info(fields: &Fields) {
         colors,
     } = fields;
 
-    println!(
+    let _ = std::io::stdout().write_all(format!(
         "
  {CYAN}     ▟█▖    {BLUE}▝█▙ ▗█▛          {user_info} ~{RESET}
  {CYAN}  ▗▄▄▟██▄▄▄▄▄{BLUE}▝█▙█▛  {CYAN}▖        {CYAN}  {BLUE}System{RESET}        {os_name}
@@ -71,5 +73,6 @@ fn print_system_info(fields: &Fields) {
  {BLUE}   ▟█▛{CYAN}▗█▖       {CYAN}▟█▛          {CYAN}  {BLUE}Desktop{RESET}       {desktop}
  {BLUE}  ▝█▛  {CYAN}██▖{BLUE}▗▄▄▄▄▄▄▄▄▄▄▄       {CYAN}󰍛  {BLUE}Memory{RESET}        {memory_usage}
  {BLUE}   ▝  {CYAN}▟█▜█▖{BLUE}▀▀▀▀▀██▛▀▀▘       {CYAN}󱥎  {BLUE}Storage (/){RESET}   {storage}
- {CYAN}     ▟█▘ ▜█▖    {BLUE}▝█▛          {CYAN}  {BLUE}Colors{RESET}        {colors}");
+ {CYAN}     ▟█▘ ▜█▖    {BLUE}▝█▛          {CYAN}  {BLUE}Colors{RESET}        {colors}
+").as_bytes());
 }
