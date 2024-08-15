@@ -21,11 +21,7 @@ pub fn get_os_pretty_name() -> Result<String, io::Error> {
     let pretty_name = os_release_content
         .lines()
         .find(|line| line.starts_with("PRETTY_NAME="))
-        .map(|line| {
-            line.trim_start_matches("PRETTY_NAME=")
-                .trim_matches('"')
-                .to_string()
-        });
+        .map(|line| line.trim_start_matches("PRETTY_NAME=").trim_matches('"'));
 
-    Ok(pretty_name.unwrap_or("Unknown".to_string()))
+    Ok(pretty_name.unwrap_or("Unknown").to_string())
 }
