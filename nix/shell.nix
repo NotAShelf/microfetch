@@ -7,6 +7,7 @@
   rustc,
   gcc,
   rustPlatform,
+  gnuplot,
 }:
 mkShell {
   strictDeps = true;
@@ -15,6 +16,7 @@ mkShell {
     cargo
     rustc
     gcc
+    gnuplot
 
     rust-analyzer-unwrapped
     rustfmt
