@@ -11,7 +11,8 @@
     pkgsForEach = nixpkgs.legacyPackages;
   in {
     packages = forEachSystem (system: {
-      default = pkgsForEach.${system}.callPackage ./nix/package.nix {};
+      default = self.packages.${system}.microfetch;
+      microfetch = pkgsForEach.${system}.callPackage ./nix/package.nix {};
     });
 
     devShells = forEachSystem (system: {
