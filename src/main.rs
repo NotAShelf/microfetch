@@ -25,7 +25,7 @@ fn main() -> Result<(), Report> {
         shell: get_shell(),
         desktop: get_desktop_info(),
         uptime: get_current(&info)?,
-        memory_usage: get_memory_usage(&info),
+        memory_usage: get_memory_usage()?,
         storage: get_root_disk_usage()?,
         colors: print_dots(),
     };
