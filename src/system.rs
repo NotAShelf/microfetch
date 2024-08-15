@@ -1,5 +1,5 @@
 use color_eyre::Result;
-use nix::sys::statvfs::statvfs;
+use nix::sys::{statvfs::statvfs, utsname::UtsName};
 
 use std::{
     env,
@@ -9,10 +9,13 @@ use std::{
 
 use crate::colors::{CYAN, GREEN, RED, RESET, YELLOW};
 
-pub fn get_username_and_hostname() -> String {
+pub fn get_username_and_hostname(utsname: &UtsName) -> String {
     let username = env::var("USER").unwrap_or("unknown_user".to_string());
-    let hostname = nix::unistd::gethostname().unwrap_or("unknown_host".to_string().into());
-    let hostname = hostname.to_string_lossy();
+    let hostname = utsname
+        .nodename()
+        .to_str()
+        .unwrap_or("unknown_host")
+        .to_string();
 
     format!("{YELLOW}{username}{RED}@{GREEN}{hostname}")
 }

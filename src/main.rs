@@ -17,10 +17,11 @@ use color_eyre::Report;
 fn main() -> Result<(), Report> {
     color_eyre::install()?;
 
+    let utsname = nix::sys::utsname::uname()?;
     let fields = Fields {
-        user_info: get_username_and_hostname(),
+        user_info: get_username_and_hostname(&utsname),
         os_name: get_os_pretty_name()?,
-        kernel_version: get_system_info()?,
+        kernel_version: get_system_info(&utsname)?,
         shell: get_shell(),
         desktop: get_desktop_info(),
         uptime: get_current()?,

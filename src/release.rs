@@ -1,11 +1,11 @@
 use color_eyre::Result;
+use nix::sys::utsname::UtsName;
 use std::{
     fs::File,
     io::{self, Read},
 };
 
-pub fn get_system_info() -> nix::Result<String> {
-    let utsname = nix::sys::utsname::uname()?;
+pub fn get_system_info(utsname: &UtsName) -> nix::Result<String> {
     Ok(format!(
         "{} {} ({})",
         utsname.sysname().to_str().unwrap_or("Unknown"),
