@@ -71,7 +71,8 @@ dependency trees and increasing build times. The latter is easily mitigated with
 Nix's binary cache, though._
 
  To benchmark individual functions,
-[Criterion](https://github.com/bheisler/criterion.rs) is used. See their README
+[Criterion.rs](https://github.com/bheisler/criterion.rs) is used. See their 
+[Getting Started Guide](https://bheisler.github.io/criterion.rs/book/getting_started.html)
 for details or just run `cargo bench` to benchmark everything.
 
 ## Customizing
