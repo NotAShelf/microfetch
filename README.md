@@ -41,16 +41,15 @@ than welcome to use it on your system: it's pretty [fast...](#benchmarks)
   - Shell Colors
 - Did I mention fast?
 
-## Installation
+## Motivation
 
-Microfetch is packaged in [nixpkgs](https://github.com/nixos/nixpkgs). You can
-get it through the unstable channel for the time being. The Nix flake can also
-be used for bleeding-edge builds.
+Fastfetch, as its name indicates, a very fast fetch tool written in C, however,
+I am not interested in any of its additional features and I very much dislike
+the defaults. Microfetch is a fetch tool that you would normally write in Bash
+and put in your `~/.bashrc` but actually _really_ fast because it opts-out of
+all customization options provided by Fastfetch. Why? Because I can.
 
-Non-Nix users will have to build Microfetch with `cargo`.
-
-Microfetch is _currently_ not available anywhere else. Though, does it _really_
-have to be?
+I cannot re-iterate it enough, Microfetch is annoyingly fast.
 
 ## Benchmarks
 
@@ -61,9 +60,9 @@ benchmarks with Hyperfine on my desktop system.
 | Command      |   Mean [ms] | Min [ms] | Max [ms] |       Relative | Written by raf? |
 | :----------- | ----------: | -------: | -------: | -------------: | --------------: |
 | `microfetch` |   1.3 ± 0.0 |      1.3 |      1.4 |           1.00 |             yes |
+| `fastfetch`  |  31.9 ± 0.8 |     30.8 |     33.8 |   24.08 ± 0.98 |              no |
 | `pfetch`     | 254.2 ± 4.8 |    246.7 |    264.9 |  191.97 ± 7.10 |              no |
 | `neofetch`   | 735.4 ± 9.5 |    721.1 |    752.8 | 555.48 ± 19.08 |              no |
-| `fastfetch`  |  31.9 ± 0.8 |     30.8 |     33.8 |   24.08 ± 0.98 |              no |
 
 _As far as I'm concerned, Microfetch is faster than almost every fetch tool
 there is. The only downside of using Rust is introducing more "bloated"
@@ -74,11 +73,29 @@ Nix's binary cache, though._
 [Getting Started Guide]: https://bheisler.github.io/criterion.rs/book/getting_started.html
 
 To benchmark individual functions, [Criterion.rs] is used. See Criterion's
-[Getting Started Guide] for details or just run `cargo bench` to benchmark
-all features of Microfetch
+[Getting Started Guide] for details or just run `cargo bench` to benchmark all
+features of Microfetch.
+
+## Installation
+
+Microfetch is packaged in [nixpkgs](https://github.com/nixos/nixpkgs). You can
+get it through the unstable channel for the time being. The Nix flake can also
+be used for bleeding-edge builds.
+
+Non-Nix users will have to build Microfetch with `cargo`. It is not published
+anywhere but I imagine you can use `cargo install --git` to install it from
+source.
+
+```bash
+cargo install --git https://github.com/notashelf/microfetch.git
+```
+
+Microfetch is _currently_ not available anywhere else. Though, does it _really_
+have to be?
+
 ## Customizing
 
-You can't\*.
+You can't.
 
 ### Why?
 
@@ -88,8 +105,11 @@ those increment execution time and resource consumption by a lot.
 
 ### Really?
 
-To be fair, you _can_ customize Microfetch by... Well, patching it. It's not the
+To be fair, you _can_ customize Microfetch by, well, patching it. It's not the
 best way per se, but it will be the only way that does not compromise on speed.
+
+The Nix package allows passing patches in a streamlined manner by passing
+`.overrideAttrs` to the derivation.
 
 ## Contributing
 
@@ -98,7 +118,8 @@ them altogether, as you might have a really good idea worth discussing but as a
 general rule of thumb consider talking to me before creating a feature PR.
 
 Contributions that help improve performance in specific areas of Microfetch are
-welcome. Though, prepare to be bombarded with questions.
+welcome. Though, prepare to be bombarded with questions if your changes are
+large.
 
 ## Hacking
 
@@ -111,7 +132,21 @@ Non-nix users will need `cargo` and `gcc` installed on their system, see
 ## Thanks
 
 Huge thanks to everyone who took the time to make pull requests or nag me in
-person about current issues.
+person about current issues. To list a few, special thanks to:
+
+- [@Nydragon](https://github.com/Nydragon) - For packaging Microfetch in Nixpkgs
+- [@ErrorNoInternet](https://github.com/ErrorNoInternet) - Performance
+  improvements and code assistance
+- [@SoraTenshi](https://github.com/SoraTenshi) - General tips and code
+  improvements
+- [@bloxx12](https://github.com/bloxx12) - Performance improvements and
+  benchmarking plots
+- [@sioodmy](https://github.com/sioodmy) - Being cute
+- [@mewoocat](https://github.com/mewoocat) - The awesome NixOS logo ASCII used
+  in Microfetch
+
+Additionally a big thank you to everyone who used, talked about or criticized
+Microfetch. I might have missed your name here, but you have my thanks.
 
 ## License
 
