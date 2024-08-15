@@ -56,9 +56,7 @@ pub fn get_memory_usage() -> Result<String, io::Error> {
 
         for line in meminfo.lines() {
             let mut split = line.split_whitespace();
-            let key = split.next().unwrap_or("");
-
-            match key {
+            match split.next().unwrap_or_default() {
                 "MemTotal:" => total_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0),
                 "MemAvailable:" => {
                     available_memory_kb = split.next().unwrap_or("0").parse().unwrap_or(0.0);
