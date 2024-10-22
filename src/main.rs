@@ -17,20 +17,24 @@ use color_eyre::Report;
 fn main() -> Result<(), Report> {
     color_eyre::install()?;
 
-    let utsname = nix::sys::utsname::uname()?;
-    let fields = Fields {
-        user_info: get_username_and_hostname(&utsname),
-        os_name: get_os_pretty_name()?,
-        kernel_version: get_system_info(&utsname)?,
-        shell: get_shell(),
-        desktop: get_desktop_info(),
-        uptime: get_current()?,
-        memory_usage: get_memory_usage()?,
-        storage: get_root_disk_usage()?,
-        colors: print_dots(),
-    };
-
-    print_system_info(&fields);
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && args[1] == "--version" {
+        println!("Microfetch {}", env!("CARGO_PKG_VERSION"));
+    } else {
+        let utsname = nix::sys::utsname::uname()?;
+        let fields = Fields {
+            user_info: get_username_and_hostname(&utsname),
+            os_name: get_os_pretty_name()?,
+            kernel_version: get_system_info(&utsname)?,
+            shell: get_shell(),
+            desktop: get_desktop_info(),
+            uptime: get_current()?,
+            memory_usage: get_memory_usage()?,
+            storage: get_root_disk_usage()?,
+            colors: print_dots(),
+        };
+        print_system_info(&fields);
+    }
 
     Ok(())
 }
