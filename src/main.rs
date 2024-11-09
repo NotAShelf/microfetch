@@ -93,10 +93,11 @@ fn print_system_info(fields: &Fields) -> io::Result<()> {
         .max()
         .unwrap_or(0);
 
-    writeln!(io::stdout(), "{:<27} {} ~{RESET}", LOGO[0], user_info)?;
+    let mut handle = io::stdout().lock();
+    writeln!(handle, "{:<27} {} ~{RESET}", LOGO[0], user_info)?;
     for (logo_line, (icon, label, value)) in LOGO[1..].iter().zip(system_info.iter()) {
         writeln!(
-            io::stdout(),
+            handle,
             "{:<27} {CYAN}{:<2} {BLUE}{:<width$}{RESET}        {value}{RESET}",
             logo_line,
             icon,
