@@ -7,6 +7,7 @@ on:
       - completed
 
 permissions:
+  contents: read
   pull-requests: write
 
 jobs:
@@ -15,35 +16,50 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Download profiling results
         uses: actions/download-artifact@v4
         with:
-          name: hotpath-results
+          name: profile-metrics
+          path: /tmp/metrics/
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
-
-      - name: Read PR number
-        id: pr
-        run: echo "number=$(cat pr_number.txt)" >> $GITHUB_OUTPUT
-
-      - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install hotpath CLI
         run: cargo install hotpath
 
-      - name: Post timing comparison comment
-         run: |
-           hotpath profile-pr \
-             --head-metrics head-timing.json \
-             --base-metrics base-timing.json \
-             --github-token ${{ secrets.GITHUB_TOKEN }} \
-             --pr-number ${{ steps.pr.outputs.number }}
+      - name: Post allocation comparison comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          HEAD_METRICS=$(cat /tmp/metrics/head_alloc.json)
+          BASE_METRICS=$(cat /tmp/metrics/base_alloc.json)
+          PR_NUMBER=$(cat /tmp/metrics/pr_number.txt)
+          hotpath profile-pr \
+            --head-metrics "$HEAD_METRICS" \
+            --base-metrics "$BASE_METRICS" \
+            --github-token "$GH_TOKEN" \
+            --pr-number "$PR_NUMBER"
 
-       - name: Post allocation comparison comment
-         run: |
-           hotpath profile-pr \
-             --head-metrics head-alloc.json \
-             --base-metrics base-alloc.json \
-             --github-token ${{ secrets.GITHUB_TOKEN }} \
-             --pr-number ${{ steps.pr.outputs.number }}
+      - name: Post timing comparison comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          HEAD_METRICS=$(cat /tmp/metrics/head_timing.json)
+          BASE_METRICS=$(cat /tmp/metrics/base_timing.json)
+          PR_NUMBER=$(cat /tmp/metrics/pr_number.txt)
+          hotpath profile-pr \
+            --head-metrics "$HEAD_METRICS" \
+            --base-metrics "$BASE_METRICS" \
+            --github-token "$GH_TOKEN" \
+            --pr-number "$PR_NUMBER"

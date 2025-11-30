@@ -4,60 +4,88 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   profile:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout PR HEAD
         uses: actions/checkout@v4
-      
-      - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-      
-      - name: Run timing profiling on HEAD
-        env:
-          HOTPATH_JSON: "true"
-        run: |
-          cargo run --features='hotpath' 2>&1 | grep '^{"hotpath_profiling_mode"' > head-timing.json
-      
-      - name: Run allocation profiling on HEAD
-        env:
-          HOTPATH_JSON: "true"
-        run: |
-          cargo run --features='hotpath,hotpath-alloc-count-total' 2>&1 | grep '^{"hotpath_profiling_mode"' > head-alloc.json
-      
-      - name: Checkout base branch
-        uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
-      
-      - name: Run timing profiling on base
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run allocation profiling on HEAD
+        id: head_alloc_metrics
         env:
           HOTPATH_JSON: "true"
         run: |
-          cargo run --features='hotpath' 2>&1 | grep '^{"hotpath_profiling_mode"' > base-timing.json
-      
+          {
+            echo 'metrics<<EOF'
+            cargo run --release --features='hotpath,hotpath-alloc' 2>&1 | grep '^{"hotpath_profiling_mode"'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run timing profiling on HEAD
+        id: head_timing_metrics
+        env:
+          HOTPATH_JSON: "true"
+        run: |
+          {
+            echo 'metrics<<EOF'
+            cargo run --release --features='hotpath' 2>&1 | grep '^{"hotpath_profiling_mode"'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout base branch
+        run: |
+          git checkout ${{ github.event.pull_request.base.sha }}
+
       - name: Run allocation profiling on base
+        id: base_alloc_metrics
         env:
           HOTPATH_JSON: "true"
         run: |
-          cargo run --features='hotpath,hotpath-alloc-count-total' 2>&1 | grep '^{"hotpath_profiling_mode"' > base-alloc.json
-      
-      - name: Save PR number
-        run: echo "${{ github.event.number }}" > pr_number.txt
-      
+          {
+            echo 'metrics<<EOF'
+            cargo run --release --features='hotpath,hotpath-alloc' 2>&1 | grep '^{"hotpath_profiling_mode"'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run timing profiling on base
+        id: base_timing_metrics
+        env:
+          HOTPATH_JSON: "true"
+        run: |
+          {
+            echo 'metrics<<EOF'
+            cargo run --release --features='hotpath' 2>&1 | grep '^{"hotpath_profiling_mode"'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Save metrics to artifact
+        run: |
+          mkdir -p /tmp/metrics
+          echo '${{ steps.head_alloc_metrics.outputs.metrics }}' > /tmp/metrics/head_alloc.json
+          echo '${{ steps.base_alloc_metrics.outputs.metrics }}' > /tmp/metrics/base_alloc.json
+          echo '${{ steps.head_timing_metrics.outputs.metrics }}' > /tmp/metrics/head_timing.json
+          echo '${{ steps.base_timing_metrics.outputs.metrics }}' > /tmp/metrics/base_timing.json
+          echo '${{ github.event.pull_request.number }}' > /tmp/metrics/pr_number.txt
+
       - name: Upload profiling results
         uses: actions/upload-artifact@v4
         with:
-          name: hotpath-results
-          path: |
-            head-timing.json
-            head-alloc.json
-            base-timing.json
-            base-alloc.json
-            pr_number.txt
+          name: profile-metrics
+          path: /tmp/metrics/
           retention-days: 1
