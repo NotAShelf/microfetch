@@ -12,7 +12,7 @@ name = "microfetch"
 path = "src/main.rs"
 
 [dependencies]
-hotpath = { optional = true, version = "0.9.0" }
+hotpath = { optional = true, version = "0.9.1" }
 libc    = "0.2.178"
 
 [dev-dependencies]
