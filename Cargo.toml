@@ -22,7 +22,7 @@ hotpath = { optional = true, version = "0.9.3" }
 libc    = "0.2.180"
 
 [dev-dependencies]
-criterion = "0.8.1"
+criterion = "0.8.2"
 
 [features]
 hotpath       = [ "dep:hotpath", "hotpath/hotpath" ]
