@@ -95,12 +95,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
-name = "base64"
-version = "0.22.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
-
-[[package]]
 name = "bitflags"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -441,12 +435,11 @@ checksum = "fc0fef456e4baa96da950455cd02c081ca953b141298e41db3fc7e36b1da849c"
 
 [[package]]
 name = "hotpath"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2dc168af8ef9f2f803292b6eca3bba81daca09df4f019f1d589d4392cc4a84e9"
+checksum = "14e824029e8ae4de779bd5087c3e06b4bf272736ace49d5f8137fdc49a497143"
 dependencies = [
  "arc-swap",
- "base64",
  "cfg-if",
  "clap",
  "colored",
@@ -469,9 +462,9 @@ dependencies = [
 
 [[package]]
 name = "hotpath-macros"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2bcbc49dbb85d4226c95a61ab989247ceddb4901c679bcfcab39e586c3e26ad"
+checksum = "aec0045cb18ddd3e8df0970e1950a838f7100f79aac1758ea15755e01c322c21"
 dependencies = [
  "proc-macro2",
  "quote",
