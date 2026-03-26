@@ -28,21 +28,21 @@ impl UtsName {
 
   #[must_use]
   pub const fn nodename(&self) -> &CStr {
-    unsafe { CStr::from_ptr(self.0.nodename.as_ptr()) }
+    unsafe { CStr::from_ptr(self.0.nodename.as_ptr().cast()) }
   }
 
   #[must_use]
   pub const fn sysname(&self) -> &CStr {
-    unsafe { CStr::from_ptr(self.0.sysname.as_ptr()) }
+    unsafe { CStr::from_ptr(self.0.sysname.as_ptr().cast()) }
   }
 
   #[must_use]
   pub const fn release(&self) -> &CStr {
-    unsafe { CStr::from_ptr(self.0.release.as_ptr()) }
+    unsafe { CStr::from_ptr(self.0.release.as_ptr().cast()) }
   }
 
   #[must_use]
   pub const fn machine(&self) -> &CStr {
-    unsafe { CStr::from_ptr(self.0.machine.as_ptr()) }
+    unsafe { CStr::from_ptr(self.0.machine.as_ptr().cast()) }
   }
 }
