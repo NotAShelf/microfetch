@@ -1,5 +1,4 @@
 #![no_std]
-extern crate alloc;
 
 pub mod colors;
 pub mod cpu;
@@ -8,7 +7,6 @@ pub mod release;
 pub mod system;
 pub mod uptime;
 
-use alloc::string::String;
 use core::{
   ffi::CStr,
   mem::MaybeUninit,
@@ -59,88 +57,6 @@ impl Error {
   #[must_use]
   pub const fn from_raw_os_error(errno: i32) -> Self {
     Self::OsError(-errno)
-  }
-}
-
-impl core::fmt::Display for Error {
-  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-    match self {
-      Self::OsError(errno) => write!(f, "OS error: {errno}"),
-      Self::InvalidData => write!(f, "Invalid data"),
-      Self::NotFound => write!(f, "Not found"),
-      Self::WriteError => write!(f, "Write error"),
-    }
-  }
-}
-
-// Simple OnceLock implementation for no_std
-pub struct OnceLock<T> {
-  ptr: AtomicPtr<T>,
-}
-
-impl<T> Default for OnceLock<T> {
-  fn default() -> Self {
-    Self::new()
-  }
-}
-
-impl<T> OnceLock<T> {
-  #[must_use]
-  pub const fn new() -> Self {
-    Self {
-      ptr: AtomicPtr::new(core::ptr::null_mut()),
-    }
-  }
-
-  pub fn get_or_init<F>(&self, f: F) -> &T
-  where
-    F: FnOnce() -> T,
-  {
-    // Load the current pointer
-    let mut ptr = self.ptr.load(Ordering::Acquire);
-
-    if ptr.is_null() {
-      // Need to initialize
-      let value = f();
-      let boxed = alloc::boxed::Box::new(value);
-      let new_ptr = alloc::boxed::Box::into_raw(boxed);
-
-      // Try to set the pointer
-      match self.ptr.compare_exchange(
-        core::ptr::null_mut(),
-        new_ptr,
-        Ordering::Release,
-        Ordering::Acquire,
-      ) {
-        Ok(_) => {
-          // We successfully set it
-          ptr = new_ptr;
-        },
-        Err(existing) => {
-          // Someone else set it first, free our allocation
-          // SAFETY: We just allocated this and no one else has seen it
-          unsafe {
-            let _ = alloc::boxed::Box::from_raw(new_ptr);
-          }
-          ptr = existing;
-        },
-      }
-    }
-
-    // SAFETY: We know ptr is non-null and points to a valid T
-    unsafe { &*ptr }
-  }
-}
-
-impl<T> Drop for OnceLock<T> {
-  fn drop(&mut self) {
-    let ptr = self.ptr.load(Ordering::Acquire);
-    if !ptr.is_null() {
-      // SAFETY: We know this was allocated via Box::into_raw
-      unsafe {
-        let _ = alloc::boxed::Box::from_raw(ptr);
-      }
-    }
   }
 }
 
@@ -226,9 +142,15 @@ pub fn getenv(name: &str) -> Option<&'static [u8]> {
 }
 
 /// Gets an environment variable as a UTF-8 string.
+///
+/// # Safety guarantee
+///
+/// Environment variables set by the shell / login process are always valid
+/// UTF-8 on any real Linux system. We skip the `from_utf8` validation and use
+/// `from_utf8_unchecked`.
 #[must_use]
 pub fn getenv_str(name: &str) -> Option<&'static str> {
-  getenv(name).and_then(|bytes| core::str::from_utf8(bytes).ok())
+  getenv(name).map(|bytes| unsafe { core::str::from_utf8_unchecked(bytes) })
 }
 
 /// Checks if an environment variable exists (regardless of its value).
@@ -276,50 +198,64 @@ impl UtsName {
   }
 }
 
-// Struct to hold all the fields we need in order to print the fetch. This
-// helps avoid Clippy warnings about argument count, and makes it slightly
-// easier to pass data around. Though, it is not like we really need to.
-struct Fields {
-  user_info:      String,
-  os_name:        String,
-  kernel_version: String,
-  cpu_name:       String,
-  cpu_cores:      String,
-  shell:          String,
-  uptime:         String,
-  desktop:        String,
-  memory_usage:   String,
-  storage:        String,
-  colors:         String,
-}
-
-/// Minimal, stack-allocated writer implementing `core::fmt::Write`. Avoids heap
-/// allocation for the output buffer.
-struct StackWriter<'a> {
+/// Minimal, stack-allocated writer.
+pub struct StackWriter<'a> {
   buf: &'a mut [u8],
   pos: usize,
 }
 
 impl<'a> StackWriter<'a> {
   #[inline]
-  const fn new(buf: &'a mut [u8]) -> Self {
+  pub const fn new(buf: &'a mut [u8]) -> Self {
     Self { buf, pos: 0 }
   }
 
   #[inline]
-  fn written(&self) -> &[u8] {
+  #[must_use]
+  pub fn written(&self) -> &[u8] {
     &self.buf[..self.pos]
   }
-}
 
-impl core::fmt::Write for StackWriter<'_> {
   #[inline]
-  fn write_str(&mut self, s: &str) -> core::fmt::Result {
-    let bytes = s.as_bytes();
-    let to_write = bytes.len().min(self.buf.len() - self.pos);
-    self.buf[self.pos..self.pos + to_write].copy_from_slice(&bytes[..to_write]);
-    self.pos += to_write;
-    Ok(())
+  pub fn push_str(&mut self, s: &str) {
+    self.push_bytes(s.as_bytes());
+  }
+
+  #[inline]
+  pub fn push_bytes(&mut self, bytes: &[u8]) {
+    let n = bytes.len().min(self.buf.len() - self.pos);
+    self.buf[self.pos..self.pos + n].copy_from_slice(&bytes[..n]);
+    self.pos += n;
+  }
+
+  #[inline]
+  pub fn push_byte(&mut self, b: u8) {
+    if self.pos < self.buf.len() {
+      self.buf[self.pos] = b;
+      self.pos += 1;
+    }
+  }
+
+  /// Write a [`CStr`]'s bytes (excluding the null terminator).
+  #[inline]
+  pub fn push_cstr(&mut self, s: &CStr) {
+    self.push_bytes(s.to_bytes());
+  }
+
+  /// Write a u64 as decimal ASCII.
+  pub fn push_u64(&mut self, mut n: u64) {
+    if n == 0 {
+      self.push_byte(b'0');
+      return;
+    }
+    let mut tmp = [0u8; 20];
+    let mut i = 20;
+    while n > 0 {
+      i -= 1;
+      tmp[i] = b'0' + (n % 10) as u8;
+      n /= 10;
+    }
+    self.push_bytes(&tmp[i..]);
   }
 }
 
@@ -336,197 +272,193 @@ const CUSTOM_LOGO: &str = match option_env!("MICROFETCH_LOGO") {
   None => "",
 };
 
-#[cfg_attr(feature = "hotpath", hotpath::measure)]
-fn print_system_info(fields: &Fields) -> Result<(), Error> {
-  let Fields {
-    user_info,
-    os_name,
-    kernel_version,
-    cpu_name,
-    cpu_cores,
-    shell,
-    uptime,
-    desktop,
-    memory_usage,
-    storage,
-    colors,
-  } = fields;
+/// Write the default two-tone NixOS braille logo for one row.
+/// Color assignments derived from flood-fill decomposition of the two lambda
+/// shapes.
+#[allow(clippy::too_many_lines)]
+fn write_logo(w: &mut StackWriter, c: &colors::Colors, row: usize) {
+  let (b, cy) = (c.blue, c.cyan);
+  match row {
+    0 => {
+      w.push_str(b);
+      w.push_str("⠀⠀⠀⠀⠀⠀⢼⣿⣄⠀⠀⠀");
+      w.push_str(cy);
+      w.push_str("⠹⣿⣷⡀⠀⣠⣿⡧⠀⠀⠀⠀⠀⠀");
+    },
+    1 => {
+      w.push_str(b);
+      w.push_str("⠀⠀⠀⠀⠀⠀⠈⢿⣿⣆⠀⠀⠀");
+      w.push_str(cy);
+      w.push_str("⠘⣿⣿⣴⣿⡿⠁⠀⠀⠀⠀⠀⠀");
+    },
+    2 => {
+      w.push_str(b);
+      w.push_str("⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡜");
+      w.push_str(cy);
+      w.push_str("⢿⣿⣟⠀⠀⠀");
+      w.push_str(b);
+      w.push_str("⢀⡄⠀⠀⠀");
+    },
+    3 => {
+      w.push_str(b);
+      w.push_str("⠀⠀⠀⠉⠉⠉⠉");
+      w.push_str(cy);
+      w.push_str("⣩⣭⡭");
+      w.push_str(b);
+      w.push_str("⠉⠉⠉⠉⠉");
+      w.push_str(cy);
+      w.push_str("⠈⢿⣿⣆⠀");
+      w.push_str(b);
+      w.push_str("⢠⣿⣿⠂⠀⠀");
+    },
+    4 => {
+      w.push_str(cy);
+      w.push_str("⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀⠀⠀⢻⡟");
+      w.push_str(b);
+      w.push_str("⣡⣿⣿⠃⠀⠀⠀");
+    },
+    5 => {
+      w.push_str(cy);
+      w.push_str("⢸⣿⣿⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀");
+      w.push_str(b);
+      w.push_str("⣰⣿⣿⣿⣿⣿⣿⡇");
+    },
+    6 => {
+      w.push_str(cy);
+      w.push_str("⠀⠀⠀⢠⣿⣿⢋");
+      w.push_str(b);
+      w.push_str("⣼⣧⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀");
+    },
+    7 => {
+      w.push_str(cy);
+      w.push_str("⠀⠀⠠⣿⣿⠃⠀");
+      w.push_str(b);
+      w.push_str("⠹⣿⣷⡀");
+      w.push_str(cy);
+      w.push_str("⣀⣀⣀⣀⣀");
+      w.push_str(b);
+      w.push_str("⣚⣛⣋");
+      w.push_str(cy);
+      w.push_str("⣀⣀⣀⣀⠀⠀⠀");
+    },
+    8 => {
+      w.push_str(cy);
+      w.push_str("⠀⠀⠀⠘⠁⠀⠀⠀");
+      w.push_str(b);
+      w.push_str("⣽⣿⣷⡜");
+      w.push_str(cy);
+      w.push_str("⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀");
+    },
+    9 => {
+      w.push_str(b);
+      w.push_str("⠀⠀⠀⠀⠀⠀⢀⣾⣿⠟⣿⣿⡄⠀⠀⠀");
+      w.push_str(cy);
+      w.push_str("⠹⣿⣷⡀⠀⠀⠀⠀⠀⠀");
+    },
+    _ => {
+      w.push_str(b);
+      w.push_str("⠀⠀⠀⠀⠀⠀⢺⣿⠋⠀⠈⢿⣿⣆⠀⠀⠀");
+      w.push_str(cy);
+      w.push_str("⠙⣿⡗⠀⠀⠀⠀⠀⠀");
+    },
+  }
+  w.push_str(c.reset);
+}
 
-  let no_color = colors::is_no_color();
-  let c = colors::Colors::new(no_color);
+// Info row labels
+struct RowLabel {
+  icon:    &'static str,
+  key:     &'static str,
+  spacing: &'static str,
+}
 
-  let mut buf = [0u8; 2560];
-  let mut w = StackWriter::new(&mut buf);
+const ROW_LABELS: [Option<RowLabel>; 11] = [
+  None, // row 0: user@host
+  Some(RowLabel {
+    icon:    "\u{F313}  ",
+    key:     "System",
+    spacing: "       \u{E621} ",
+  }),
+  Some(RowLabel {
+    icon:    "\u{E712}  ",
+    key:     "Kernel",
+    spacing: "       \u{E621} ",
+  }),
+  Some(RowLabel {
+    icon:    "\u{F2DB}  ",
+    key:     "CPU",
+    spacing: "          \u{E621} ",
+  }),
+  Some(RowLabel {
+    icon:    "\u{F4BC}  ",
+    key:     "Topology",
+    spacing: "     \u{E621} ",
+  }),
+  Some(RowLabel {
+    icon:    "\u{E795}  ",
+    key:     "Shell",
+    spacing: "        \u{E621} ",
+  }),
+  Some(RowLabel {
+    icon:    "\u{F017}  ",
+    key:     "Uptime",
+    spacing: "       \u{E621} ",
+  }),
+  Some(RowLabel {
+    icon:    "\u{F2D2}  ",
+    key:     "Desktop",
+    spacing: "      \u{E621} ",
+  }),
+  Some(RowLabel {
+    icon:    "\u{F035B}  ",
+    key:     "Memory",
+    spacing: "       \u{E621} ",
+  }),
+  Some(RowLabel {
+    icon:    "\u{F194E}  ",
+    key:     "Storage (/)",
+    spacing: "  \u{E621} ",
+  }),
+  Some(RowLabel {
+    icon:    "\u{E22B}  ",
+    key:     "Colors",
+    spacing: "       \u{E621} ",
+  }),
+];
 
-  if CUSTOM_LOGO.is_empty() {
-    // Default two-tone NixOS logo rendered as a single write! pass.
-    core::fmt::write(
-      &mut w,
-      format_args!(
-        "\n    {b}⠀⠀⠀⠀⠀⠀⢼⣿⣄⠀⠀⠀{cy}⠹⣿⣷⡀⠀⣠⣿⡧⠀⠀⠀⠀⠀⠀{rs}  {user_info} ~{rs}\
-         \n    {b}⠀⠀⠀⠀⠀⠀⠈⢿⣿⣆⠀⠀⠀{cy}⠘⣿⣿⣴⣿⡿⠁⠀⠀⠀⠀⠀⠀{rs}  {cy}\u{F313}  {b}System{rs}       \u{E621} {os_name}\
-         \n    {b}⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡜{cy}⢿⣿⣟⠀⠀⠀{b}⢀⡄⠀⠀⠀{rs}  {cy}\u{E712}  {b}Kernel{rs}       \u{E621} {kernel_version}\
-         \n    {b}⠀⠀⠀⠉⠉⠉⠉{cy}⣩⣭⡭{b}⠉⠉⠉⠉⠉{cy}⠈⢿⣿⣆⠀{b}⢠⣿⣿⠂⠀⠀{rs}  {cy}\u{F2DB}  {b}CPU{rs}          \u{E621} {cpu_name}\
-         \n    {cy}⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀⠀⠀⢻⡟{b}⣡⣿⣿⠃⠀⠀⠀{rs}  {cy}\u{F4BC}  {b}Topology{rs}     \u{E621} {cpu_cores}\
-         \n    {cy}⢸⣿⣿⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{b}⣰⣿⣿⣿⣿⣿⣿⡇{rs}  {cy}\u{E795}  {b}Shell{rs}        \u{E621} {shell}\
-         \n    {cy}⠀⠀⠀⢠⣿⣿⢋{b}⣼⣧⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀{rs}  {cy}\u{F017}  {b}Uptime{rs}       \u{E621} {uptime}\
-         \n    {cy}⠀⠀⠠⣿⣿⠃⠀{b}⠹⣿⣷⡀{cy}⣀⣀⣀⣀⣀{b}⣚⣛⣋{cy}⣀⣀⣀⣀⠀⠀⠀{rs}  {cy}\u{F2D2}  {b}Desktop{rs}      \u{E621} {desktop}\
-         \n    {cy}⠀⠀⠀⠘⠁⠀⠀⠀{b}⣽⣿⣷⡜{cy}⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀{rs}  {cy}\u{F035B}  {b}Memory{rs}       \u{E621} {memory_usage}\
-         \n    {b}⠀⠀⠀⠀⠀⠀⢀⣾⣿⠟⣿⣿⡄⠀⠀⠀{cy}⠹⣿⣷⡀⠀⠀⠀⠀⠀⠀{rs}  {cy}\u{F194E}  {b}Storage (/){rs}  \u{E621} {storage}\
-         \n    {b}⠀⠀⠀⠀⠀⠀⢺⣿⠋⠀⠈⢿⣿⣆⠀⠀⠀{cy}⠙⣿⡗⠀⠀⠀⠀⠀⠀{rs}  {cy}\u{E22B}  {b}Colors{rs}       \u{E621} {colors}\n\n",
-        b = c.blue,
-        cy = c.cyan,
-        rs = c.reset,
-        user_info = user_info,
-        os_name = os_name,
-        kernel_version = kernel_version,
-        cpu_name = cpu_name,
-        cpu_cores = cpu_cores,
-        shell = shell,
-        uptime = uptime,
-        desktop = desktop,
-        memory_usage = memory_usage,
-        storage = storage,
-        colors = colors,
-      ),
-    )
-    .ok();
+/// Write one row: logo + label + value.
+#[inline]
+#[allow(clippy::ref_option)]
+fn write_row(
+  w: &mut StackWriter,
+  c: &colors::Colors,
+  row: usize,
+  custom_logo: &str,
+  use_custom: bool,
+  label: &Option<RowLabel>,
+  write_value: impl FnOnce(&mut StackWriter),
+  suffix: &str,
+) {
+  w.push_str("    ");
+  if use_custom {
+    w.push_str(c.cyan);
+    w.push_str(custom_logo);
+    w.push_str(c.reset);
   } else {
-    // Custom logo is 11 lines from MICROFETCH_LOGO env var, one per info row.
-    // Lines beyond 11 are ignored; missing lines render as empty.
-    let mut lines = CUSTOM_LOGO.split('\n');
-    let logo_rows: [&str; 11] =
-      core::array::from_fn(|_| lines.next().unwrap_or(""));
-
-    // Row format mirrors the default logo path exactly.
-    let rows: [(&str, &str, &str, &str, &str); 11] = [
-      ("", "", user_info.as_str(), "        ", " ~"),
-      (
-        "\u{F313}  ",
-        "System",
-        os_name.as_str(),
-        "       \u{E621} ",
-        "",
-      ),
-      (
-        "\u{E712}  ",
-        "Kernel",
-        kernel_version.as_str(),
-        "       \u{E621} ",
-        "",
-      ),
-      (
-        "\u{F2DB}  ",
-        "CPU",
-        cpu_name.as_str(),
-        "          \u{E621} ",
-        "",
-      ),
-      (
-        "\u{F4BC}  ",
-        "Topology",
-        cpu_cores.as_str(),
-        "     \u{E621} ",
-        "",
-      ),
-      (
-        "\u{E795}  ",
-        "Shell",
-        shell.as_str(),
-        "        \u{E621} ",
-        "",
-      ),
-      (
-        "\u{F017}  ",
-        "Uptime",
-        uptime.as_str(),
-        "       \u{E621} ",
-        "",
-      ),
-      (
-        "\u{F2D2}  ",
-        "Desktop",
-        desktop.as_str(),
-        "      \u{E621} ",
-        "",
-      ),
-      (
-        "\u{F035B}  ",
-        "Memory",
-        memory_usage.as_str(),
-        "       \u{E621} ",
-        "",
-      ),
-      (
-        "\u{F194E}  ",
-        "Storage (/)",
-        storage.as_str(),
-        "  \u{E621} ",
-        "",
-      ),
-      (
-        "\u{E22B}  ",
-        "Colors",
-        colors.as_str(),
-        "       \u{E621} ",
-        "",
-      ),
-    ];
-
-    core::fmt::write(&mut w, format_args!("\n")).ok();
-    for i in 0..11 {
-      let (icon, key, value, spacing, suffix) = rows[i];
-      if key.is_empty() {
-        // Row 1 has  no icon/key, just logo + user_info
-        core::fmt::write(
-          &mut w,
-          format_args!(
-            "    {cy}{logo}{rs}  {value}{suffix}\n",
-            cy = c.cyan,
-            rs = c.reset,
-            logo = logo_rows[i],
-            value = value,
-            suffix = suffix,
-          ),
-        )
-        .ok();
-      } else {
-        core::fmt::write(
-          &mut w,
-          format_args!(
-            "    {cy}{logo}{rs}  \
-             {cy}{icon}{b}{key}{rs}{spacing}{value}{suffix}\n",
-            cy = c.cyan,
-            b = c.blue,
-            rs = c.reset,
-            logo = logo_rows[i],
-            icon = icon,
-            key = key,
-            spacing = spacing,
-            value = value,
-            suffix = suffix,
-          ),
-        )
-        .ok();
-      }
-    }
-    core::fmt::write(&mut w, format_args!("\n")).ok();
+    write_logo(w, c, row);
   }
-
-  // Single syscall for the entire output.
-  let out = w.written();
-  let written = unsafe { sys_write(1, out.as_ptr(), out.len()) };
-  if written < 0 {
-    #[allow(clippy::cast_possible_truncation)]
-    return Err(Error::OsError(written as i32));
+  w.push_str("  ");
+  if let Some(l) = label {
+    w.push_str(c.cyan);
+    w.push_str(l.icon);
+    w.push_str(c.blue);
+    w.push_str(l.key);
+    w.push_str(c.reset);
+    w.push_str(l.spacing);
   }
-
-  #[allow(clippy::cast_sign_loss)]
-  if written as usize != out.len() {
-    return Err(Error::WriteError);
-  }
-
-  Ok(())
+  write_value(w);
+  w.push_str(suffix);
+  w.push_byte(b'\n');
 }
 
 /// Print version information using direct syscall.
@@ -587,20 +519,135 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
   }
 
   let utsname = UtsName::uname()?;
-  let fields = Fields {
-    user_info:      system::get_username_and_hostname(&utsname),
-    os_name:        release::get_os_pretty_name()?,
-    kernel_version: release::get_system_info(&utsname),
-    cpu_name:       cpu::get_cpu_name(),
-    cpu_cores:      cpu::get_cpu_cores()?,
-    shell:          system::get_shell(),
-    desktop:        desktop::get_desktop_info(),
-    uptime:         uptime::get_current()?,
-    memory_usage:   system::get_memory_usage()?,
-    storage:        system::get_root_disk_usage()?,
-    colors:         colors::print_dots(),
+  let no_color = colors::is_no_color();
+  let c = colors::Colors::new(no_color);
+
+  let mut buf = [0u8; 2560];
+  let mut w = StackWriter::new(&mut buf);
+
+  // Custom logo is 11 lines from MICROFETCH_LOGO env var, one per info row.
+  // Lines beyond 11 are ignored; missing lines render as empty.
+  let custom_lines: [&str; 11];
+  let use_custom = !CUSTOM_LOGO.is_empty();
+  let logo_lines = if use_custom {
+    let mut lines_iter = CUSTOM_LOGO.split('\n');
+    custom_lines = core::array::from_fn(|_| lines_iter.next().unwrap_or(""));
+    &custom_lines
+  } else {
+    &[""; 11] // unused, we use LOGO pairs below
   };
-  print_system_info(&fields)?;
+
+  w.push_byte(b'\n');
+
+  macro_rules! row {
+    ($idx:expr, $write_value:expr, $suffix:expr) => {
+      write_row(
+        &mut w,
+        &c,
+        $idx,
+        if use_custom { logo_lines[$idx] } else { "" },
+        use_custom,
+        &ROW_LABELS[$idx],
+        $write_value,
+        $suffix,
+      );
+    };
+  }
+
+  row!(
+    0,
+    |w: &mut StackWriter| {
+      system::write_username_and_hostname(w, &c, &utsname);
+      w.push_str(" ~");
+      w.push_str(c.reset);
+    },
+    ""
+  );
+  row!(
+    1,
+    |w: &mut StackWriter| {
+      let _ = release::write_os_pretty_name(w);
+    },
+    ""
+  );
+  row!(
+    2,
+    |w: &mut StackWriter| {
+      release::write_system_info(w, &utsname);
+    },
+    ""
+  );
+  row!(
+    3,
+    |w: &mut StackWriter| {
+      cpu::write_cpu_name(w);
+    },
+    ""
+  );
+  row!(
+    4,
+    |w: &mut StackWriter| {
+      let _ = cpu::write_cpu_cores(w);
+    },
+    ""
+  );
+  row!(
+    5,
+    |w: &mut StackWriter| {
+      system::write_shell(w);
+    },
+    ""
+  );
+  row!(
+    6,
+    |w: &mut StackWriter| {
+      let _ = uptime::write_uptime(w);
+    },
+    ""
+  );
+  row!(
+    7,
+    |w: &mut StackWriter| {
+      desktop::write_desktop_info(w);
+    },
+    ""
+  );
+  row!(
+    8,
+    |w: &mut StackWriter| {
+      let _ = system::write_memory_usage(w, &c);
+    },
+    ""
+  );
+  row!(
+    9,
+    |w: &mut StackWriter| {
+      let _ = system::write_root_disk_usage(w, &c);
+    },
+    ""
+  );
+  row!(
+    10,
+    |w: &mut StackWriter| {
+      colors::write_dots(w, &c);
+    },
+    ""
+  );
+
+  w.push_byte(b'\n');
+
+  // Single syscall for the entire output.
+  let out = w.written();
+  let written = unsafe { sys_write(1, out.as_ptr(), out.len()) };
+  if written < 0 {
+    #[allow(clippy::cast_possible_truncation)]
+    return Err(Error::OsError(written as i32));
+  }
+
+  #[allow(clippy::cast_sign_loss)]
+  if written as usize != out.len() {
+    return Err(Error::WriteError);
+  }
 
   Ok(())
 }

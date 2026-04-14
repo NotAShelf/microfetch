@@ -1,63 +1,48 @@
-use alloc::string::String;
-
 #[cfg(target_os = "linux")]
 use crate::syscall::read_file_fast;
-use crate::{Error, UtsName};
+use crate::{Error, StackWriter, UtsName};
 
-#[must_use]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn get_system_info(utsname: &UtsName) -> String {
-  let sysname = utsname.sysname().to_str().unwrap_or("Unknown");
-  let release = utsname.release().to_str().unwrap_or("Unknown");
-  let machine = utsname.machine().to_str().unwrap_or("Unknown");
-
-  // Pre-allocate capacity: sysname + " " + release + " (" + machine + ")"
-  let capacity = sysname.len() + 1 + release.len() + 2 + machine.len() + 1;
-  let mut result = String::with_capacity(capacity);
-
-  // Manual string construction instead of write! macro
-  result.push_str(sysname);
-  result.push(' ');
-  result.push_str(release);
-  result.push_str(" (");
-  result.push_str(machine);
-  result.push(')');
-
-  result
+pub fn write_system_info(w: &mut StackWriter, utsname: &UtsName) {
+  w.push_cstr(utsname.sysname());
+  w.push_byte(b' ');
+  w.push_cstr(utsname.release());
+  w.push_str(" (");
+  w.push_cstr(utsname.machine());
+  w.push_byte(b')');
 }
 
-/// Gets the pretty name of the OS via `kern.osproductversion` (macOS),
-/// e.g. `macOS 14.5`.
+/// Writes the OS name from `kern.osproductversion` (macOS), e.g. `macOS 14.5`.
 ///
 /// # Errors
 ///
 /// Never errors; falls back to `macOS` if the version sysctl is unavailable.
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn get_os_pretty_name() -> Result<String, Error> {
-  let mut name = String::from("macOS");
+pub fn write_os_pretty_name(w: &mut StackWriter) -> Result<(), Error> {
+  w.push_str("macOS");
   let mut buf = [0u8; 64];
   if let Some(n) =
     crate::syscall::macos_sysctl_str(b"kern.osproductversion\0", &mut buf)
   {
-    if let Ok(ver) = core::str::from_utf8(&buf[..n]) {
-      if !ver.is_empty() {
-        name.push(' ');
-        name.push_str(ver);
+    if let Ok(version) = core::str::from_utf8(&buf[..n]) {
+      if !version.is_empty() {
+        w.push_byte(b' ');
+        w.push_str(version);
       }
     }
   }
-  Ok(name)
+  Ok(())
 }
 
-/// Gets the pretty name of the OS from `/etc/os-release`.
+/// Writes the pretty name of the OS from `/etc/os-release`.
 ///
 /// # Errors
 ///
 /// Returns an error if `/etc/os-release` cannot be read.
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn get_os_pretty_name() -> Result<String, Error> {
+pub fn write_os_pretty_name(w: &mut StackWriter) -> Result<(), Error> {
   // Fast byte-level scanning for PRETTY_NAME=
   const PREFIX: &[u8] = b"PRETTY_NAME=";
 
@@ -67,7 +52,6 @@ pub fn get_os_pretty_name() -> Result<String, Error> {
   let bytes_read = read_file_fast("/etc/os-release", &mut buffer)
     .map_err(Error::from_raw_os_error)?;
   let content = &buffer[..bytes_read];
-
   let mut offset = 0;
 
   while offset < content.len() {
@@ -93,12 +77,16 @@ pub fn get_os_pretty_name() -> Result<String, Error> {
         value
       };
 
-      // Convert to String - should be valid UTF-8
-      return Ok(String::from_utf8_lossy(trimmed).into_owned());
+      // Write bytes directly — os-release values are effectively always
+      // valid UTF-8 (ASCII names, version numbers). No lossy conversion
+      // needed.
+      w.push_bytes(trimmed);
+      return Ok(());
     }
 
     offset += line_end + 1;
   }
 
-  Ok(String::from("Unknown"))
+  w.push_str("Unknown");
+  Ok(())
 }

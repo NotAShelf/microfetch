@@ -10,20 +10,16 @@
   feature(asm_experimental_arch)
 )]
 
-extern crate alloc;
-
 #[cfg(not(target_os = "macos"))] use core::arch::naked_asm;
-use core::panic::PanicInfo;
 
-use microfetch_alloc::BumpAllocator;
 // The custom `_start` (and the `entry_rust` it calls) is Linux-only.
 #[cfg(not(target_os = "macos"))]
 use microfetch_asm::entry_rust;
+use microfetch_asm::sys_write;
 // Re-export libc replacement functions from asm crate. On macOS these are
 // provided by libSystem, so we don't define (or re-export) our own.
 #[cfg(not(target_os = "macos"))]
 pub use microfetch_asm::{memcpy, memset, strlen};
-use microfetch_asm::{sys_exit, sys_write};
 
 #[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
@@ -303,10 +299,6 @@ unsafe extern "C" fn _start() {
   );
 }
 
-// Global allocator
-#[global_allocator]
-static ALLOCATOR: BumpAllocator = BumpAllocator::new();
-
 /// Main application entry point. Called by the asm crate's entry point
 /// after setting up argc, argv, and envp.
 ///
@@ -328,9 +320,9 @@ pub unsafe extern "C" fn main(argc: i32, argv: *const *const u8) -> i32 {
   // Run the main application logic
   match unsafe { microfetch_lib::run(argc, argv) } {
     Ok(()) => 0,
-    Err(e) => {
-      let msg = alloc::format!("Error: {e}\n");
-      let _ = unsafe { sys_write(2, msg.as_ptr(), msg.len()) };
+    Err(_) => {
+      const ERR_MSG: &[u8] = b"Error\n";
+      let _ = unsafe { sys_write(2, ERR_MSG.as_ptr(), ERR_MSG.len()) };
       1
     },
   }
@@ -338,11 +330,11 @@ pub unsafe extern "C" fn main(argc: i32, argv: *const *const u8) -> i32 {
 
 #[cfg(not(test))]
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(_info: &core::panic::PanicInfo) -> ! {
   const PANIC_MSG: &[u8] = b"panic\n";
   unsafe {
     let _ = sys_write(2, PANIC_MSG.as_ptr(), PANIC_MSG.len());
-    sys_exit(1)
+    microfetch_asm::sys_exit(1)
   }
 }
 
@@ -354,7 +346,7 @@ const extern "C" fn rust_eh_personality() {}
 #[cfg(not(test))]
 #[unsafe(no_mangle)]
 extern "C" fn _Unwind_Resume() -> ! {
-  unsafe { sys_exit(1) }
+  unsafe { microfetch_asm::sys_exit(1) }
 }
 
 // compiler_builtins emits `.ARM.exidx` entries that reference these even

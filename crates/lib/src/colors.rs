@@ -1,4 +1,4 @@
-use alloc::string::String;
+use crate::StackWriter;
 
 /// Color codes for terminal output
 pub struct Colors {
@@ -59,47 +59,27 @@ pub(crate) fn is_no_color() -> bool {
   is_set
 }
 
-#[must_use]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn print_dots() -> String {
-  const GLYPH: &str = "";
+pub fn write_dots(w: &mut StackWriter, colors: &Colors) {
+  const GLYPH: &str = "●";
 
-  let colors = if is_no_color() {
-    Colors::new(true)
-  } else {
-    Colors::new(false)
-  };
-
-  // Pre-calculate capacity: 6 color codes + "  " (glyph + 2 spaces) per color
-  let capacity = colors.blue.len()
-    + colors.cyan.len()
-    + colors.green.len()
-    + colors.yellow.len()
-    + colors.red.len()
-    + colors.magenta.len()
-    + colors.reset.len()
-    + (GLYPH.len() + 2) * 6;
-
-  let mut result = String::with_capacity(capacity);
-  result.push_str(colors.blue);
-  result.push_str(GLYPH);
-  result.push_str("  ");
-  result.push_str(colors.cyan);
-  result.push_str(GLYPH);
-  result.push_str("  ");
-  result.push_str(colors.green);
-  result.push_str(GLYPH);
-  result.push_str("  ");
-  result.push_str(colors.yellow);
-  result.push_str(GLYPH);
-  result.push_str("  ");
-  result.push_str(colors.red);
-  result.push_str(GLYPH);
-  result.push_str("  ");
-  result.push_str(colors.magenta);
-  result.push_str(GLYPH);
-  result.push_str("  ");
-  result.push_str(colors.reset);
-
-  result
+  w.push_str(colors.blue);
+  w.push_str(GLYPH);
+  w.push_str("  ");
+  w.push_str(colors.cyan);
+  w.push_str(GLYPH);
+  w.push_str("  ");
+  w.push_str(colors.green);
+  w.push_str(GLYPH);
+  w.push_str("  ");
+  w.push_str(colors.yellow);
+  w.push_str(GLYPH);
+  w.push_str("  ");
+  w.push_str(colors.red);
+  w.push_str(GLYPH);
+  w.push_str("  ");
+  w.push_str(colors.magenta);
+  w.push_str(GLYPH);
+  w.push_str("  ");
+  w.push_str(colors.reset);
 }
