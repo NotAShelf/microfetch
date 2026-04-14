@@ -1,54 +1,41 @@
-use alloc::string::String;
 use core::mem::MaybeUninit;
 
 #[cfg(target_os = "linux")]
 use crate::syscall::read_file_fast;
 use crate::{
   Error,
+  StackWriter,
   UtsName,
   colors::Colors,
   syscall::{StatfsBuf, sys_statfs},
 };
 
-#[must_use]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn get_username_and_hostname(utsname: &UtsName) -> String {
+pub fn write_username_and_hostname(
+  w: &mut StackWriter,
+  colors: &Colors,
+  utsname: &UtsName,
+) {
   let username = crate::getenv_str("USER").unwrap_or("unknown_user");
-  let hostname = utsname.nodename().to_str().unwrap_or("unknown_host");
+  let hostname = utsname.nodename();
 
-  // Get colors (checking NO_COLOR only once)
-  let no_color = crate::colors::is_no_color();
-  let colors = Colors::new(no_color);
-
-  let capacity = colors.yellow.len()
-    + username.len()
-    + colors.red.len()
-    + 1
-    + colors.green.len()
-    + hostname.len()
-    + colors.reset.len();
-  let mut result = String::with_capacity(capacity);
-
-  result.push_str(colors.yellow);
-  result.push_str(username);
-  result.push_str(colors.red);
-  result.push('@');
-  result.push_str(colors.green);
-  result.push_str(hostname);
-  result.push_str(colors.reset);
-
-  result
+  w.push_str(colors.yellow);
+  w.push_str(username);
+  w.push_str(colors.red);
+  w.push_byte(b'@');
+  w.push_str(colors.green);
+  w.push_cstr(hostname);
+  w.push_str(colors.reset);
 }
 
-#[must_use]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn get_shell() -> String {
+pub fn write_shell(w: &mut StackWriter) {
   let shell = crate::getenv_str("SHELL").unwrap_or("");
-  let start = shell.rfind('/').map_or(0, |i| i + 1);
   if shell.is_empty() {
-    String::from("unknown_shell")
+    w.push_str("unknown_shell");
   } else {
-    String::from(&shell[start..])
+    let start = shell.rfind('/').map_or(0, |i| i + 1);
+    w.push_str(&shell[start..]);
   }
 }
 
@@ -58,7 +45,10 @@ pub fn get_shell() -> String {
 ///
 /// Returns an error if the filesystem information cannot be retrieved.
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn get_root_disk_usage() -> Result<String, Error> {
+pub fn write_root_disk_usage(
+  w: &mut StackWriter,
+  colors: &Colors,
+) -> Result<(), Error> {
   let mut vfs = MaybeUninit::<StatfsBuf>::uninit();
   let path = b"/\0";
 
@@ -75,64 +65,39 @@ pub fn get_root_disk_usage() -> Result<String, Error> {
   let total_bytes = block_size * total_blocks;
   let used_bytes = total_bytes - (block_size * available_blocks);
 
-  let no_color = crate::colors::is_no_color();
-  let colors = Colors::new(no_color);
-
-  let mut result = String::with_capacity(64);
-
-  write_gib(&mut result, used_bytes);
-  result.push_str(" GiB / ");
-  write_gib(&mut result, total_bytes);
-  result.push_str(" GiB (");
-  result.push_str(colors.cyan);
+  write_gib(w, used_bytes);
+  w.push_str(" GiB / ");
+  write_gib(w, total_bytes);
+  w.push_str(" GiB (");
+  w.push_str(colors.cyan);
   let pct = if total_bytes > 0 {
     used_bytes * 100 / total_bytes
   } else {
     0
   };
-  write_u64(&mut result, pct);
-  result.push('%');
-  result.push_str(colors.reset);
-  result.push(')');
+  w.push_u64(pct);
+  w.push_byte(b'%');
+  w.push_str(colors.reset);
+  w.push_byte(b')');
 
-  Ok(result)
+  Ok(())
 }
 
-fn write_centi_gib(s: &mut String, centi_gib: u64) {
-  write_u64(s, centi_gib / 100);
-  s.push('.');
+fn write_centi_gib(w: &mut StackWriter, centi_gib: u64) {
+  w.push_u64(centi_gib / 100);
+  w.push_byte(b'.');
   let frac = (centi_gib % 100) as u8;
-  s.push((b'0' + frac / 10) as char);
-  s.push((b'0' + frac % 10) as char);
+  w.push_byte(b'0' + frac / 10);
+  w.push_byte(b'0' + frac % 10);
 }
 
-fn write_gib(s: &mut String, bytes: u64) {
-  write_centi_gib(s, (bytes * 100 + (1 << 29)) >> 30);
+fn write_gib(w: &mut StackWriter, bytes: u64) {
+  write_centi_gib(w, (bytes * 100 + (1 << 29)) >> 30);
 }
 
 #[cfg(target_os = "linux")]
-fn write_kb_as_gib(s: &mut String, kb: u64) {
-  write_centi_gib(s, (kb * 100 + (1 << 19)) >> 20);
-}
-
-/// Write a u64 to string
-pub fn write_u64(s: &mut String, mut n: u64) {
-  if n == 0 {
-    s.push('0');
-    return;
-  }
-
-  let mut buf = [0u8; 20];
-  let mut i = 20;
-
-  while n > 0 {
-    i -= 1;
-    buf[i] = b'0' + (n % 10) as u8;
-    n /= 10;
-  }
-
-  // SAFETY: buf contains only ASCII digits
-  s.push_str(unsafe { core::str::from_utf8_unchecked(&buf[i..]) });
+fn write_kb_as_gib(w: &mut StackWriter, kb: u64) {
+  write_centi_gib(w, (kb * 100 + (1 << 19)) >> 20);
 }
 
 /// Fast integer parsing without stdlib overhead
@@ -150,14 +115,17 @@ fn parse_u64_fast(s: &[u8]) -> u64 {
   result
 }
 
-/// Gets the system memory usage information via `sysctl`/Mach (macOS).
+/// Writes the system memory usage information via `sysctl`/Mach (macOS).
 ///
 /// # Errors
 ///
 /// Returns an error if the memory statistics cannot be retrieved.
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn get_memory_usage() -> Result<String, Error> {
+pub fn write_memory_usage(
+  w: &mut StackWriter,
+  colors: &Colors,
+) -> Result<(), Error> {
   let (used_bytes, total_bytes) =
     crate::syscall::macos_meminfo().ok_or(Error::OsError(0))?;
   let percentage_used = if total_bytes > 0 {
@@ -165,20 +133,18 @@ pub fn get_memory_usage() -> Result<String, Error> {
   } else {
     0
   };
-  let colors = Colors::new(crate::colors::is_no_color());
-  let mut result = String::with_capacity(64);
 
-  write_gib(&mut result, used_bytes);
-  result.push_str(" GiB / ");
-  write_gib(&mut result, total_bytes);
-  result.push_str(" GiB (");
-  result.push_str(colors.cyan);
-  write_u64(&mut result, percentage_used);
-  result.push('%');
-  result.push_str(colors.reset);
-  result.push(')');
+  write_gib(w, used_bytes);
+  w.push_str(" GiB / ");
+  write_gib(w, total_bytes);
+  w.push_str(" GiB (");
+  w.push_str(colors.cyan);
+  w.push_u64(percentage_used);
+  w.push_byte(b'%');
+  w.push_str(colors.reset);
+  w.push_byte(b')');
 
-  Ok(result)
+  Ok(())
 }
 
 /// Gets the system memory usage information.
@@ -188,7 +154,10 @@ pub fn get_memory_usage() -> Result<String, Error> {
 /// Returns an error if `/proc/meminfo` cannot be read.
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn get_memory_usage() -> Result<String, Error> {
+pub fn write_memory_usage(
+  w: &mut StackWriter,
+  colors: &Colors,
+) -> Result<(), Error> {
   #[cfg_attr(feature = "hotpath", hotpath::measure)]
   fn parse_memory_info() -> Result<(u64, u64), Error> {
     let mut total_memory_kb = 0u64;
@@ -246,20 +215,15 @@ pub fn get_memory_usage() -> Result<String, Error> {
     0
   };
 
-  let no_color = crate::colors::is_no_color();
-  let colors = Colors::new(no_color);
+  write_kb_as_gib(w, used_kb);
+  w.push_str(" GiB / ");
+  write_kb_as_gib(w, total_kb);
+  w.push_str(" GiB (");
+  w.push_str(colors.cyan);
+  w.push_u64(percentage_used);
+  w.push_byte(b'%');
+  w.push_str(colors.reset);
+  w.push_byte(b')');
 
-  let mut result = String::with_capacity(64);
-
-  write_kb_as_gib(&mut result, used_kb);
-  result.push_str(" GiB / ");
-  write_kb_as_gib(&mut result, total_kb);
-  result.push_str(" GiB (");
-  result.push_str(colors.cyan);
-  write_u64(&mut result, percentage_used);
-  result.push('%');
-  result.push_str(colors.reset);
-  result.push(')');
-
-  Ok(result)
+  Ok(())
 }

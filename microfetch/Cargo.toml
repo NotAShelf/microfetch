@@ -15,7 +15,6 @@ test       = false
 
 [dependencies]
 hotpath                    = { optional = true, version = "0.21.2" }
-microfetch-alloc.workspace = true
 microfetch-asm.workspace   = true
 microfetch-lib.workspace   = true
 

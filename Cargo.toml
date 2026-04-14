@@ -1,5 +1,5 @@
 [workspace]
-members  = [ "crates/*", "microfetch", "crates/benchmarks" ]
+members  = [ "crates/asm", "crates/benchmarks", "crates/lib", "microfetch" ]
 resolver = "3"
 
 [workspace.package]
@@ -9,9 +9,8 @@ rust-version = "1.95.0"
 version      = "1.2.0"
 
 [workspace.dependencies]
-microfetch-alloc = { path = "./crates/alloc", version = "1.2.0" }
-microfetch-asm   = { path = "./crates/asm", version = "1.2.0" }
-microfetch-lib   = { path = "./crates/lib", version = "1.2.0" }
+microfetch-asm = { path = "./crates/asm", version = "1.2.0" }
+microfetch-lib = { path = "./crates/lib", version = "1.2.0" }
 
 criterion                 = { default-features = false, features = [ "cargo_bench_support" ], version = "0.8.2" }
 criterion-cycles-per-byte = "0.8.0"

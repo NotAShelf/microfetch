@@ -1,37 +1,30 @@
-use alloc::string::String;
-
 #[cfg(target_os = "linux")]
 use crate::syscall::read_file_fast;
-use crate::{Error, system::write_u64};
+use crate::{Error, StackWriter};
 
-/// Gets CPU model name (trimmed), or empty string if unavailable.
+/// Writes CPU model name (trimmed) to the writer.
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-#[must_use]
-pub fn get_cpu_name() -> String {
-  get_model_name().unwrap_or_default()
+pub fn write_cpu_name(w: &mut StackWriter) {
+  write_model_name(w);
 }
 
-/// Gets CPU model name from `machdep.cpu.brand_string` (macOS),
+/// Writes CPU model name from `machdep.cpu.brand_string` (macOS),
 /// e.g. `Apple M2 Pro`. Returns an empty string if unavailable.
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn get_cpu_name() -> String {
+pub fn write_cpu_name(w: &mut StackWriter) {
   let mut buf = [0u8; 128];
-  match crate::syscall::macos_sysctl_str(
-    b"machdep.cpu.brand_string\0",
-    &mut buf,
-  ) {
-    Some(n) => {
-      core::str::from_utf8(&buf[..n])
-        .map(String::from)
-        .unwrap_or_default()
-    },
-    None => String::new(),
+  if let Some(n) =
+    crate::syscall::macos_sysctl_str(b"machdep.cpu.brand_string\0", &mut buf)
+  {
+    if let Ok(name) = core::str::from_utf8(&buf[..n]) {
+      w.push_str(name);
+    }
   }
 }
 
-/// Gets CPU core/thread info as a string.
+/// Writes CPU core/thread info string.
 ///
 /// Format: `{cores} cores ({p}p/{e}e), {threads} threads` on hybrid Intel,
 /// `{cores} cores, {threads} threads` otherwise.
@@ -41,13 +34,14 @@ pub fn get_cpu_name() -> String {
 /// Returns an error if the thread count cannot be determined.
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn get_cpu_cores() -> Result<String, Error> {
+pub fn write_cpu_cores(w: &mut StackWriter) -> Result<(), Error> {
   let threads = get_thread_count()?;
   let cores = get_core_count(threads);
-  Ok(format_cores(cores, get_pe_cores(), threads))
+  write_cores(w, cores, get_pe_cores(), threads);
+  Ok(())
 }
 
-/// Gets CPU core/thread info via `sysctl` (macOS).
+/// Writes CPU core/thread info via `sysctl` (macOS).
 ///
 /// On Apple Silicon `hw.perflevel0`/`hw.perflevel1` expose the performance
 /// (P) and efficiency (E) core counts respectively.
@@ -57,7 +51,7 @@ pub fn get_cpu_cores() -> Result<String, Error> {
 /// Returns an error if the logical CPU count cannot be determined.
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn get_cpu_cores() -> Result<String, Error> {
+pub fn write_cpu_cores(w: &mut StackWriter) -> Result<(), Error> {
   use crate::syscall::macos_sysctl_u32;
 
   let threads =
@@ -74,33 +68,35 @@ pub fn get_cpu_cores() -> Result<String, Error> {
     _ => None,
   };
 
-  Ok(format_cores(cores, pe, threads))
+  write_cores(w, cores, pe, threads);
+  Ok(())
 }
 
-/// Formats core/thread counts identically across platforms:
+/// Writes core/thread counts identically across platforms:
 /// `{cores} cores ({p}p/{e}e), {threads} threads`, omitting the P/E group and
 /// the thread suffix when not applicable.
-fn format_cores(cores: u32, pe: Option<(u32, u32)>, threads: u32) -> String {
-  let mut result = String::new();
-
-  write_u64(&mut result, u64::from(cores));
-  result.push_str(" cores");
+fn write_cores(
+  w: &mut StackWriter,
+  cores: u32,
+  pe: Option<(u32, u32)>,
+  threads: u32,
+) {
+  w.push_u64(u64::from(cores));
+  w.push_str(" cores");
 
   if let Some((p, e)) = pe {
-    result.push_str(" (");
-    write_u64(&mut result, u64::from(p));
-    result.push_str("p/");
-    write_u64(&mut result, u64::from(e));
-    result.push_str("e)");
+    w.push_str(" (");
+    w.push_u64(u64::from(p));
+    w.push_str("p/");
+    w.push_u64(u64::from(e));
+    w.push_str("e)");
   }
 
   if threads != cores {
-    result.push_str(", ");
-    write_u64(&mut result, u64::from(threads));
-    result.push_str(" threads");
+    w.push_str(", ");
+    w.push_u64(u64::from(threads));
+    w.push_str(" threads");
   }
-
-  result
 }
 
 /// Count online threads via `sched_getaffinity(2)`.
@@ -313,38 +309,46 @@ fn get_cpu_freq_mhz() -> Option<u32> {
   None
 }
 
-/// Parse CPU model name from `/proc/cpuinfo` and append frequency.
+/// Parse CPU model name from `/proc/cpuinfo` and write it directly.
+/// Appends CPU frequency if available.
 #[cfg(target_os = "linux")]
-fn get_model_name() -> Option<String> {
+fn write_model_name(w: &mut StackWriter) {
   let mut buf = [0u8; 2048];
-  let n = read_file_fast("/proc/cpuinfo", &mut buf).ok()?;
+  let Ok(n) = read_file_fast("/proc/cpuinfo", &mut buf) else {
+    return;
+  };
   let data = &buf[..n];
 
-  let base = extract_name(data)?;
-  let mut name = base;
+  let found = if let Some(name) = extract_name(data) {
+    w.push_str(name);
+    true
+  } else {
+    write_dt_compatible(w)
+  };
+  if !found {
+    return;
+  }
+
   if let Some(mhz) = get_cpu_freq_mhz() {
-    name.push_str(" @ ");
+    w.push_str(" @ ");
     // Round to nearest 0.01 GHz, then split so carries (e.g. 1999 MHz)
     // roll into the integer part instead of overflowing the fraction.
     let rounded_centesimal = (mhz + 5) / 10;
     let ghz_int = rounded_centesimal / 100;
     let ghz_frac = rounded_centesimal % 100;
-    write_u64(&mut name, u64::from(ghz_int));
-    name.push('.');
+    w.push_u64(u64::from(ghz_int));
+    w.push_byte(b'.');
     if ghz_frac < 10 {
-      name.push('0');
+      w.push_byte(b'0');
     }
-    write_u64(&mut name, u64::from(ghz_frac));
-    name.push_str(" GHz");
+    w.push_u64(u64::from(ghz_frac));
+    w.push_str(" GHz");
   }
-  Some(name)
 }
 
-/// Extract a human-readable CPU name. Tries cpuinfo fields first, then
-/// falls back to the device-tree `compatible` string on `SoCs` that don't
-/// expose a model through cpuinfo.
+/// Extract a human-readable CPU name from cpuinfo fields.
 #[cfg(target_os = "linux")]
-fn extract_name(data: &[u8]) -> Option<String> {
+fn extract_name(data: &[u8]) -> Option<&str> {
   for key in &[
     b"model name" as &[u8],
     b"Model Name",
@@ -358,35 +362,42 @@ fn extract_name(data: &[u8]) -> Option<String> {
     if let Some(val) = extract_field(data, key) {
       let trimmed = trim(val);
       if !trimmed.is_empty() {
-        return Some(String::from(trimmed));
+        return Some(trimmed);
       }
     }
   }
-  parse_dt_compatible()
+  None
 }
 
-/// Parse the `SoC` name from `/sys/firmware/devicetree/base/compatible`.
+/// Write the `SoC` name from `/sys/firmware/devicetree/base/compatible`.
 /// The file holds NUL-separated `vendor,model` strings from most-specific
-/// (board) to most-generic (`SoC`); we take the last entry and return just
+/// (board) to most-generic (`SoC`); we take the last entry and write just
 /// the model portion after the comma.
 #[cfg(target_os = "linux")]
-fn parse_dt_compatible() -> Option<String> {
+fn write_dt_compatible(w: &mut StackWriter) -> bool {
   let mut buf = [0u8; 256];
-  let n = read_file_fast("/sys/firmware/devicetree/base/compatible", &mut buf)
-    .ok()?;
+  let Ok(n) =
+    read_file_fast("/sys/firmware/devicetree/base/compatible", &mut buf)
+  else {
+    return false;
+  };
   // Drop the terminating NUL so the rposition below locates the entry
   // separator rather than the end-of-string marker.
   let end = if n > 0 && buf[n - 1] == 0 { n - 1 } else { n };
   let data = &buf[..end];
   let start = data.iter().rposition(|&b| b == 0).map_or(0, |p| p + 1);
   let entry = &data[start..];
-  let comma = entry.iter().position(|&b| b == b',')?;
-  let model = core::str::from_utf8(&entry[comma + 1..]).ok()?;
+  let Some(comma) = entry.iter().position(|&b| b == b',') else {
+    return false;
+  };
+  let Ok(model) = core::str::from_utf8(&entry[comma + 1..]) else {
+    return false;
+  };
   if model.is_empty() {
-    None
-  } else {
-    Some(String::from(model))
+    return false;
   }
+  w.push_str(model);
+  true
 }
 
 /// Extract value of first occurrence of `key` in cpuinfo.
@@ -411,7 +422,8 @@ fn extract_field<'a>(data: &'a [u8], key: &[u8]) -> Option<&'a str> {
         while p < line.len() && line[p] == b' ' {
           p += 1;
         }
-        return core::str::from_utf8(&line[p..]).ok();
+        // SAFETY: cpuinfo fields are ASCII
+        return Some(unsafe { core::str::from_utf8_unchecked(&line[p..]) });
       }
     }
 
