@@ -368,7 +368,7 @@ const ROW_LABELS: [Option<RowLabel>; 11] = [
 ];
 
 /// Write one row: logo + label + value.
-#[inline]
+#[inline(never)]
 #[allow(clippy::ref_option)]
 fn write_row(
   w: &mut StackWriter,
@@ -377,7 +377,7 @@ fn write_row(
   use_custom: bool,
   logo: &mut &[u8],
   label: &Option<RowLabel>,
-  write_value: impl FnOnce(&mut StackWriter),
+  write_value: &mut dyn FnMut(&mut StackWriter),
   suffix: &str,
 ) {
   w.push_str("    ");
@@ -490,7 +490,7 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
         use_custom,
         &mut logo,
         &ROW_LABELS[$idx],
-        $write_value,
+        &mut $write_value,
         $suffix,
       );
     };
