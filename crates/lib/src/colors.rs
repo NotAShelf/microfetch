@@ -61,25 +61,16 @@ pub(crate) fn is_no_color() -> bool {
 
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_dots(w: &mut StackWriter, colors: &Colors) {
-  const GLYPH: &str = "●";
-
-  w.push_str(colors.blue);
-  w.push_str(GLYPH);
-  w.push_str("  ");
-  w.push_str(colors.cyan);
-  w.push_str(GLYPH);
-  w.push_str("  ");
-  w.push_str(colors.green);
-  w.push_str(GLYPH);
-  w.push_str("  ");
-  w.push_str(colors.yellow);
-  w.push_str(GLYPH);
-  w.push_str("  ");
-  w.push_str(colors.red);
-  w.push_str(GLYPH);
-  w.push_str("  ");
-  w.push_str(colors.magenta);
-  w.push_str(GLYPH);
-  w.push_str("  ");
+  for c in [
+    colors.blue,
+    colors.cyan,
+    colors.green,
+    colors.yellow,
+    colors.red,
+    colors.magenta,
+  ] {
+    w.push_str(c);
+    w.push_str("●  ");
+  }
   w.push_str(colors.reset);
 }
