@@ -210,9 +210,9 @@ fn format_cpufreq_path(buf: &mut [u8; 64], cpu: u32) -> usize {
   i + SUFFIX.len()
 }
 
-/// Read CPU frequency in MHz. Tries sysfs first, then cpuinfo fields.
+/// Read CPU frequency in MHz. Tries sysfs first, then cpuinfo data.
 #[cfg(target_os = "linux")]
-fn get_cpu_freq_mhz() -> Option<u32> {
+fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
   // Read cpuinfo_max_freq across all CPUs (in kHz) and take the max so
   // heterogeneous (big.LITTLE) topologies report the performance cluster.
   let mut max_khz = 0u32;
@@ -244,9 +244,6 @@ fn get_cpu_freq_mhz() -> Option<u32> {
     return Some(max_khz / 1000);
   }
   // Fall back to cpuinfo fields
-  let mut buf2 = [0u8; 4096];
-  let n = read_file_fast("/proc/cpuinfo", &mut buf2).ok()?;
-  let data = &buf2[..n];
   for key in &[
     b"cpu MHz" as &[u8],
     b"cpu MHz dynamic",
@@ -256,7 +253,7 @@ fn get_cpu_freq_mhz() -> Option<u32> {
     // BogoMIPS on MIPS is calibrated to the clock frequency (unlike x86).
     b"BogoMIPS",
   ] {
-    if let Some(val) = extract_field(data, key) {
+    if let Some(val) = extract_field(cpuinfo, key) {
       // Parse integer part of the MHz value (e.g. "5200.00" -> 5200)
       let mut mhz = 0u32;
       for &b in val.as_bytes() {
@@ -271,7 +268,7 @@ fn get_cpu_freq_mhz() -> Option<u32> {
       // Octeon presets loops_per_jiffy to clock_rate/HZ, so its BogoMIPS is
       // exactly 2x the core clock, unlike the 1:1 of other MIPS.
       // https://github.com/torvalds/linux/blob/v6.19/arch/mips/cavium-octeon/csrc-octeon.c#L40
-      if *key == b"BogoMIPS" && data.windows(6).any(|w| w == b"Octeon") {
+      if *key == b"BogoMIPS" && cpuinfo.windows(6).any(|w| w == b"Octeon") {
         mhz /= 2;
       }
 
@@ -282,7 +279,7 @@ fn get_cpu_freq_mhz() -> Option<u32> {
   }
   // SPARC exposes its clock as `Cpu0ClkTck : <hex>`,
   // which signifies ticks per second in hex.
-  if let Some(val) = extract_field(data, b"Cpu0ClkTck") {
+  if let Some(val) = extract_field(cpuinfo, b"Cpu0ClkTck") {
     let mut hz = 0u64;
     let mut seen = false;
     for &b in val.as_bytes() {
@@ -324,7 +321,7 @@ fn write_model_name(w: &mut StackWriter) {
     return;
   }
 
-  let mhz = get_cpu_freq_mhz();
+  let mhz = get_cpu_freq_mhz(data);
   if let Some(name) = name {
     // x86 `model name` already ends in `@ <clock>GHz`, which hides the
     // ` CPU` that trim() would otherwise strip, so re-trim after cutting.
