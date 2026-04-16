@@ -272,96 +272,37 @@ const CUSTOM_LOGO: &str = match option_env!("MICROFETCH_LOGO") {
   None => "",
 };
 
-/// Write the default two-tone NixOS braille logo for one row.
-/// Color assignments derived from flood-fill decomposition of the two lambda
-/// shapes.
-#[allow(clippy::too_many_lines)]
-fn write_logo(w: &mut StackWriter, c: &colors::Colors, row: usize) {
-  let (b, cy) = (c.blue, c.cyan);
-  match row {
-    0 => {
-      w.push_str(b);
-      w.push_str("⠀⠀⠀⠀⠀⠀⢼⣿⣄⠀⠀⠀");
-      w.push_str(cy);
-      w.push_str("⠹⣿⣷⡀⠀⣠⣿⡧⠀⠀⠀⠀⠀⠀");
-    },
-    1 => {
-      w.push_str(b);
-      w.push_str("⠀⠀⠀⠀⠀⠀⠈⢿⣿⣆⠀⠀⠀");
-      w.push_str(cy);
-      w.push_str("⠘⣿⣿⣴⣿⡿⠁⠀⠀⠀⠀⠀⠀");
-    },
-    2 => {
-      w.push_str(b);
-      w.push_str("⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡜");
-      w.push_str(cy);
-      w.push_str("⢿⣿⣟⠀⠀⠀");
-      w.push_str(b);
-      w.push_str("⢀⡄⠀⠀⠀");
-    },
-    3 => {
-      w.push_str(b);
-      w.push_str("⠀⠀⠀⠉⠉⠉⠉");
-      w.push_str(cy);
-      w.push_str("⣩⣭⡭");
-      w.push_str(b);
-      w.push_str("⠉⠉⠉⠉⠉");
-      w.push_str(cy);
-      w.push_str("⠈⢿⣿⣆⠀");
-      w.push_str(b);
-      w.push_str("⢠⣿⣿⠂⠀⠀");
-    },
-    4 => {
-      w.push_str(cy);
-      w.push_str("⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀⠀⠀⢻⡟");
-      w.push_str(b);
-      w.push_str("⣡⣿⣿⠃⠀⠀⠀");
-    },
-    5 => {
-      w.push_str(cy);
-      w.push_str("⢸⣿⣿⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀");
-      w.push_str(b);
-      w.push_str("⣰⣿⣿⣿⣿⣿⣿⡇");
-    },
-    6 => {
-      w.push_str(cy);
-      w.push_str("⠀⠀⠀⢠⣿⣿⢋");
-      w.push_str(b);
-      w.push_str("⣼⣧⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀");
-    },
-    7 => {
-      w.push_str(cy);
-      w.push_str("⠀⠀⠠⣿⣿⠃⠀");
-      w.push_str(b);
-      w.push_str("⠹⣿⣷⡀");
-      w.push_str(cy);
-      w.push_str("⣀⣀⣀⣀⣀");
-      w.push_str(b);
-      w.push_str("⣚⣛⣋");
-      w.push_str(cy);
-      w.push_str("⣀⣀⣀⣀⠀⠀⠀");
-    },
-    8 => {
-      w.push_str(cy);
-      w.push_str("⠀⠀⠀⠘⠁⠀⠀⠀");
-      w.push_str(b);
-      w.push_str("⣽⣿⣷⡜");
-      w.push_str(cy);
-      w.push_str("⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀");
-    },
-    9 => {
-      w.push_str(b);
-      w.push_str("⠀⠀⠀⠀⠀⠀⢀⣾⣿⠟⣿⣿⡄⠀⠀⠀");
-      w.push_str(cy);
-      w.push_str("⠹⣿⣷⡀⠀⠀⠀⠀⠀⠀");
-    },
-    _ => {
-      w.push_str(b);
-      w.push_str("⠀⠀⠀⠀⠀⠀⢺⣿⠋⠀⠈⢿⣿⣆⠀⠀⠀");
-      w.push_str(cy);
-      w.push_str("⠙⣿⡗⠀⠀⠀⠀⠀⠀");
-    },
+/// Packed logo rows. `0` separates rows; `1` and `2` select colors.
+const LOGO: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/logo.bin"));
+
+/// Write the default two-tone NixOS braille logo for one row, advancing
+/// `logo` past the row separator so the next call resumes where this left off.
+#[inline(never)]
+fn write_logo(w: &mut StackWriter, c: &colors::Colors, logo: &mut &[u8]) {
+  let colors = [c.blue, c.cyan];
+  let row_data = *logo;
+
+  let mut i = 0;
+  while i < row_data.len() {
+    match row_data[i] {
+      0 => {
+        i += 1;
+        break;
+      },
+      1 | 2 => {
+        w.push_str(colors[(row_data[i] - 1) as usize]);
+        i += 1;
+      },
+      _ => {
+        let chunk_start = i;
+        while i < row_data.len() && row_data[i] > 2 {
+          i += 1;
+        }
+        w.push_bytes(&row_data[chunk_start..i]);
+      },
+    }
   }
+  *logo = &row_data[i..];
   w.push_str(c.reset);
 }
 
@@ -432,9 +373,9 @@ const ROW_LABELS: [Option<RowLabel>; 11] = [
 fn write_row(
   w: &mut StackWriter,
   c: &colors::Colors,
-  row: usize,
   custom_logo: &str,
   use_custom: bool,
+  logo: &mut &[u8],
   label: &Option<RowLabel>,
   write_value: impl FnOnce(&mut StackWriter),
   suffix: &str,
@@ -445,7 +386,7 @@ fn write_row(
     w.push_str(custom_logo);
     w.push_str(c.reset);
   } else {
-    write_logo(w, c, row);
+    write_logo(w, c, logo);
   }
   w.push_str("  ");
   if let Some(l) = label {
@@ -536,6 +477,7 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
   } else {
     &[""; 11] // unused, we use LOGO pairs below
   };
+  let mut logo = LOGO;
 
   w.push_byte(b'\n');
 
@@ -544,9 +486,9 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
       write_row(
         &mut w,
         &c,
-        $idx,
         if use_custom { logo_lines[$idx] } else { "" },
         use_custom,
+        &mut logo,
         &ROW_LABELS[$idx],
         $write_value,
         $suffix,
