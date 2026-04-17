@@ -7,7 +7,7 @@ use crate::{Error, system::write_u64};
 /// Gets CPU model name (trimmed), or empty string if unavailable.
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-#[must_use] 
+#[must_use]
 pub fn get_cpu_name() -> String {
   get_model_name().unwrap_or_default()
 }
