@@ -175,7 +175,7 @@ const HOST_VM_INFO64: c_int = 4;
 /// `host_statistics64` matches the kernel's expectation exactly (38 ints).
 #[repr(C)]
 #[derive(Default)]
-#[expect(dead_code, reason = "most fields exist only to fix the struct layout")]
+#[allow(dead_code, reason = "most fields exist only to fix the struct layout")]
 struct VmStatistics64 {
   free_count:                             u32,
   active_count:                           u32,
@@ -240,7 +240,7 @@ pub fn macos_meminfo() -> Option<(u64, u64)> {
 /// `struct timeval` (`time_t` is 64-bit, `suseconds_t` is 32-bit on macOS).
 #[repr(C)]
 #[derive(Default)]
-#[expect(
+#[allow(
   dead_code,
   reason = "tv_usec/_pad exist only to fix the struct layout"
 )]

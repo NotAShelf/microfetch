@@ -58,7 +58,6 @@ pub fn get_shell() -> String {
 ///
 /// Returns an error if the filesystem information cannot be retrieved.
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-#[allow(clippy::cast_precision_loss)]
 pub fn get_root_disk_usage() -> Result<String, Error> {
   let mut vfs = MaybeUninit::<StatfsBuf>::uninit();
   let path = b"/\0";
@@ -73,25 +72,25 @@ pub fn get_root_disk_usage() -> Result<String, Error> {
   let total_blocks = vfs.f_blocks;
   let available_blocks = vfs.f_bavail;
 
-  let total_size = block_size * total_blocks;
-  let used_size = total_size - (block_size * available_blocks);
-
-  let total_size = total_size as f64 / (1024.0 * 1024.0 * 1024.0);
-  let used_size = used_size as f64 / (1024.0 * 1024.0 * 1024.0);
-  let usage = (used_size / total_size) * 100.0;
+  let total_bytes = block_size * total_blocks;
+  let used_bytes = total_bytes - (block_size * available_blocks);
 
   let no_color = crate::colors::is_no_color();
   let colors = Colors::new(no_color);
 
   let mut result = String::with_capacity(64);
 
-  // Manual float formatting
-  write_float(&mut result, used_size, 2);
+  write_gib(&mut result, used_bytes);
   result.push_str(" GiB / ");
-  write_float(&mut result, total_size, 2);
+  write_gib(&mut result, total_bytes);
   result.push_str(" GiB (");
   result.push_str(colors.cyan);
-  write_float(&mut result, usage, 0);
+  let pct = if total_bytes > 0 {
+    used_bytes * 100 / total_bytes
+  } else {
+    0
+  };
+  write_u64(&mut result, pct);
   result.push('%');
   result.push_str(colors.reset);
   result.push(')');
@@ -99,55 +98,21 @@ pub fn get_root_disk_usage() -> Result<String, Error> {
   Ok(result)
 }
 
-/// Write a float to string with specified decimal places
-#[allow(
-  clippy::cast_sign_loss,
-  clippy::cast_possible_truncation,
-  clippy::cast_precision_loss
-)]
-fn write_float(s: &mut String, val: f64, decimals: u32) {
-  // Handle integer part
-  let int_part = val as u64;
-  write_u64(s, int_part);
-
-  if decimals > 0 {
-    s.push('.');
-
-    // Calculate fractional part
-    let mut frac = val - int_part as f64;
-    for _ in 0..decimals {
-      frac *= 10.0;
-      let digit = frac as u8;
-      s.push((b'0' + digit) as char);
-      frac -= f64::from(digit);
-    }
-  }
+fn write_centi_gib(s: &mut String, centi_gib: u64) {
+  write_u64(s, centi_gib / 100);
+  s.push('.');
+  let frac = (centi_gib % 100) as u8;
+  s.push((b'0' + frac / 10) as char);
+  s.push((b'0' + frac % 10) as char);
 }
 
-/// Round an f64 to nearest integer (`f64::round` is not in core)
-#[allow(
-  clippy::cast_precision_loss,
-  clippy::cast_possible_truncation,
-  clippy::cast_sign_loss
-)]
-fn round_f64(x: f64) -> f64 {
-  if x >= 0.0 {
-    let int_part = x as u64 as f64;
-    let frac = x - int_part;
-    if frac >= 0.5 {
-      int_part + 1.0
-    } else {
-      int_part
-    }
-  } else {
-    let int_part = (-x) as u64 as f64;
-    let frac = -x - int_part;
-    if frac >= 0.5 {
-      -(int_part + 1.0)
-    } else {
-      -int_part
-    }
-  }
+fn write_gib(s: &mut String, bytes: u64) {
+  write_centi_gib(s, (bytes * 100 + (1 << 29)) >> 30);
+}
+
+#[cfg(target_os = "linux")]
+fn write_kb_as_gib(s: &mut String, kb: u64) {
+  write_centi_gib(s, (kb * 100 + (1 << 19)) >> 20);
 }
 
 /// Write a u64 to string
@@ -195,20 +160,25 @@ fn parse_u64_fast(s: &[u8]) -> u64 {
 pub fn get_memory_usage() -> Result<String, Error> {
   let (used_bytes, total_bytes) =
     crate::syscall::macos_meminfo().ok_or(Error::OsError(0))?;
+  let percentage_used = if total_bytes > 0 {
+    (used_bytes * 100 + total_bytes / 2) / total_bytes
+  } else {
+    0
+  };
+  let colors = Colors::new(crate::colors::is_no_color());
+  let mut result = String::with_capacity(64);
 
-  const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
-  #[expect(
-    clippy::cast_precision_loss,
-    reason = "GiB display tolerates f64 rounding"
-  )]
-  let used_memory = used_bytes as f64 / GIB;
-  #[expect(
-    clippy::cast_precision_loss,
-    reason = "GiB display tolerates f64 rounding"
-  )]
-  let total_memory = total_bytes as f64 / GIB;
+  write_gib(&mut result, used_bytes);
+  result.push_str(" GiB / ");
+  write_gib(&mut result, total_bytes);
+  result.push_str(" GiB (");
+  result.push_str(colors.cyan);
+  write_u64(&mut result, percentage_used);
+  result.push('%');
+  result.push_str(colors.reset);
+  result.push(')');
 
-  Ok(format_memory(used_memory, total_memory))
+  Ok(result)
 }
 
 /// Gets the system memory usage information.
@@ -220,7 +190,7 @@ pub fn get_memory_usage() -> Result<String, Error> {
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn get_memory_usage() -> Result<String, Error> {
   #[cfg_attr(feature = "hotpath", hotpath::measure)]
-  fn parse_memory_info() -> Result<(f64, f64), Error> {
+  fn parse_memory_info() -> Result<(u64, u64), Error> {
     let mut total_memory_kb = 0u64;
     let mut available_memory_kb = 0u64;
     let mut buffer = [0u8; 1024];
@@ -266,32 +236,24 @@ pub fn get_memory_usage() -> Result<String, Error> {
       offset += line_end + 1;
     }
 
-    #[allow(clippy::cast_precision_loss)]
-    let total_gb = total_memory_kb as f64 / 1024.0 / 1024.0;
-    #[allow(clippy::cast_precision_loss)]
-    let available_gb = available_memory_kb as f64 / 1024.0 / 1024.0;
-    let used_memory_gb = total_gb - available_gb;
-
-    Ok((used_memory_gb, total_gb))
+    Ok((total_memory_kb - available_memory_kb, total_memory_kb))
   }
 
-  let (used_memory, total_memory) = parse_memory_info()?;
-  Ok(format_memory(used_memory, total_memory))
-}
-
-/// Formats `used`/`total` memory (both in GiB) into the display string.
-fn format_memory(used_memory: f64, total_memory: f64) -> String {
-  #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-  let percentage_used = round_f64(used_memory / total_memory * 100.0) as u64;
+  let (used_kb, total_kb) = parse_memory_info()?;
+  let percentage_used = if total_kb > 0 {
+    (used_kb * 100 + total_kb / 2) / total_kb
+  } else {
+    0
+  };
 
   let no_color = crate::colors::is_no_color();
   let colors = Colors::new(no_color);
 
   let mut result = String::with_capacity(64);
 
-  write_float(&mut result, used_memory, 2);
+  write_kb_as_gib(&mut result, used_kb);
   result.push_str(" GiB / ");
-  write_float(&mut result, total_memory, 2);
+  write_kb_as_gib(&mut result, total_kb);
   result.push_str(" GiB (");
   result.push_str(colors.cyan);
   write_u64(&mut result, percentage_used);
@@ -299,5 +261,5 @@ fn format_memory(used_memory: f64, total_memory: f64) -> String {
   result.push_str(colors.reset);
   result.push(')');
 
-  result
+  Ok(result)
 }
