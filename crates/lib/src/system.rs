@@ -1,3 +1,4 @@
+include!(concat!(env!("OUT_DIR"), "/color_helpers.rs"));
 use core::mem::MaybeUninit;
 
 #[cfg(target_os = "linux")]
@@ -112,11 +113,14 @@ pub fn write_memory_usage(writer: &mut StackWriter, colors: &Colors) {
     .checked_div(total_bytes)
     .unwrap_or(0);
 
+  let no_color = crate::colors::is_no_color();
+  let colors = Colors::new(no_color);
+
   write_gib(writer, used_bytes);
   writer.push_str(" GiB / ");
   write_gib(writer, total_bytes);
   writer.push_str(" GiB (");
-  writer.push_str(colors.cyan);
+  writer.push_str(colors.icon);
   writer.push_u64(percentage_used);
   writer.push_byte(b'%');
   writer.push_str(colors.reset);
@@ -175,11 +179,14 @@ pub fn write_memory_usage(writer: &mut StackWriter, colors: &Colors) {
     .checked_div(total_kb)
     .unwrap_or(0);
 
+  let no_color = crate::colors::is_no_color();
+  let colors = Colors::new(no_color);
+
   write_kb_as_gib(writer, used_kb);
   writer.push_str(" GiB / ");
   write_kb_as_gib(writer, total_kb);
   writer.push_str(" GiB (");
-  writer.push_str(colors.cyan);
+  writer.push_str(colors.icon);
   writer.push_u64(percentage_used);
   writer.push_byte(b'%');
   writer.push_str(colors.reset);

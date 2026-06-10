@@ -1,3 +1,4 @@
+include!(concat!(env!("OUT_DIR"), "/colors_config.rs"));
 use crate::StackWriter;
 
 /// Color codes for terminal output.
@@ -9,6 +10,11 @@ pub struct Colors {
   pub yellow:  &'static str,
   pub red:     &'static str,
   pub magenta: &'static str,
+  pub l1:      &'static str,
+  pub l2:      &'static str,
+  pub icon:    &'static str,
+  pub key:     &'static str,
+  pub value:   &'static str,
 }
 
 impl Colors {
@@ -23,6 +29,11 @@ impl Colors {
         yellow:  "",
         red:     "",
         magenta: "",
+        l1:      "",
+        l2:      "",
+        icon:    "",
+        key:     "",
+        value:   "",
       }
     } else {
       Self {
@@ -33,6 +44,11 @@ impl Colors {
         yellow:  "\x1b[33m",
         red:     "\x1b[31m",
         magenta: "\x1b[35m",
+        l1:      COLOR_LOGO1,
+        l2:      COLOR_LOGO2,
+        icon:    COLOR_ICON,
+        key:     COLOR_KEY,
+        value:   COLOR_VAL,
       }
     }
   }
