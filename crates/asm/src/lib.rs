@@ -21,7 +21,11 @@
 )]
 
 // Per-arch syscall implementations live in their own module files.
+// macOS is matched first; there `target_arch` is `aarch64`, but the
+// implementation is libSystem-backed rather than raw `svc` traps.
 core::cfg_select! {
+  all(target_os = "macos", target_arch = "aarch64") => { #[path = "darwin.rs"  ] mod arch; }
+  target_os = "macos"         => { compile_error!("microfetch on macOS supports aarch64 (Apple Silicon) only"); }
   target_arch = "x86_64"      => { #[path = "x86_64.rs"     ] mod arch;        }
   target_arch = "aarch64"     => { #[path = "aarch64.rs"    ] mod arch;        }
   target_arch = "riscv64"     => { #[path = "riscv64.rs"    ] mod arch;        }
@@ -39,12 +43,24 @@ core::cfg_select! {
   _                           => { compile_error!("Unsupported architecture"); }
 }
 
+/// macOS-only helpers backed by `sysctl`/Mach (see `darwin.rs`).
+#[cfg(target_os = "macos")]
+pub use arch::{
+  macos_meminfo,
+  macos_sysctl_str,
+  macos_sysctl_u32,
+  macos_uptime_secs,
+};
+
 /// Copies `n` bytes from `src` to `dest`.
 ///
 /// # Safety
 ///
 /// `dest` and `src` must be valid pointers to non-overlapping regions of
 /// memory of at least `n` bytes.
+// On macOS these symbols are supplied by libSystem; defining our own would
+// clash at link time, so the freestanding implementations are Linux-only.
+#[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memcpy(
   dest: *mut u8,
@@ -65,6 +81,7 @@ pub unsafe extern "C" fn memcpy(
 ///
 /// `s` must be a valid pointer to memory of at least `n` bytes.
 /// The value in `c` is treated as unsigned (lower 8 bits used).
+#[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8 {
   for i in 0..n {
@@ -80,6 +97,7 @@ pub unsafe extern "C" fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8 {
 /// # Safety
 ///
 /// `s1` and `s2` must be valid pointers to memory of at least `n` bytes.
+#[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn bcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
   for i in 0..n {
@@ -97,6 +115,7 @@ pub unsafe extern "C" fn bcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
 /// # Safety
 ///
 /// `s1` and `s2` must be valid pointers to memory of at least `n` bytes.
+#[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
   unsafe { bcmp(s1, s2, n) }
@@ -107,6 +126,7 @@ pub unsafe extern "C" fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
 /// # Safety
 ///
 /// `s` must be a valid pointer to a null-terminated string.
+#[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
 pub const unsafe extern "C" fn strlen(s: *const u8) -> usize {
   let mut len = 0;
@@ -118,15 +138,17 @@ pub const unsafe extern "C" fn strlen(s: *const u8) -> usize {
 
 /// Function pointer type for the main application entry point.
 /// The function receives argc and argv and should return an exit code.
-#[cfg(not(test))]
+// On macOS the C runtime calls `main` directly, so the custom `_start` /
+// `entry_rust` path below is Linux-only.
+#[cfg(all(not(test), not(target_os = "macos")))]
 pub type MainFn = unsafe extern "C" fn(i32, *const *const u8) -> i32;
 
-#[cfg(not(test))]
+#[cfg(all(not(test), not(target_os = "macos")))]
 static mut MAIN_FN: Option<MainFn> = None;
 
 /// Register the main function to be called from the entry point.
 /// This must be called before the program starts (e.g., in a constructor).
-#[cfg(not(test))]
+#[cfg(all(not(test), not(target_os = "macos")))]
 pub fn register_main(main_fn: MainFn) {
   unsafe {
     MAIN_FN = Some(main_fn);
@@ -148,7 +170,7 @@ pub fn register_main(main_fn: MainFn) {
 /// ```rust,ignore
 /// unsafe extern "C" fn main(argc: i32, argv: *const *const u8) -> i32`
 /// ```
-#[cfg(not(test))]
+#[cfg(all(not(test), not(target_os = "macos")))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn entry_rust(stack: *const usize) -> i32 {
   // Read argc and argv from stack
@@ -165,7 +187,7 @@ pub unsafe extern "C" fn entry_rust(stack: *const usize) -> i32 {
 // External main function that must be defined by the binary using this crate.
 // Signature: `unsafe extern "C" fn main(argc: i32, argv: *const *const u8) ->
 // i32`
-#[cfg(not(test))]
+#[cfg(all(not(test), not(target_os = "macos")))]
 unsafe extern "C" {
   fn main(argc: i32, argv: *const *const u8) -> i32;
 }
@@ -241,6 +263,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
 /// not used, nor any useful to us here.
 #[repr(C)]
 #[allow(dead_code)]
+#[cfg(not(target_os = "macos"))]
 pub struct UtsNameBuf {
   pub sysname:    [i8; 65],
   pub nodename:   [i8; 65],
@@ -248,6 +271,19 @@ pub struct UtsNameBuf {
   pub version:    [i8; 65],
   pub machine:    [i8; 65],
   pub domainname: [i8; 65], // GNU extension, included for correct struct size
+}
+
+/// macOS `struct utsname`: five `char[_SYS_NAMELEN]` fields (`_SYS_NAMELEN`
+/// is 256) and no `domainname`. Field names match the Linux layout so the
+/// `UtsName` accessors in `microfetch-lib` work unchanged.
+#[repr(C)]
+#[cfg(target_os = "macos")]
+pub struct UtsNameBuf {
+  pub sysname:  [i8; 256],
+  pub nodename: [i8; 256],
+  pub release:  [i8; 256],
+  pub version:  [i8; 256],
+  pub machine:  [i8; 256],
 }
 
 /// Direct `uname(2)` syscall
@@ -272,6 +308,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
 /// declared; the remainder of the 120-byte struct is covered by `_pad`.
 #[repr(C)]
 #[cfg(not(any(
+  target_os = "macos",
   target_arch = "s390x",
   target_arch = "arm",
   target_arch = "riscv32",
@@ -296,6 +333,31 @@ pub struct StatfsBuf {
 
   #[allow(clippy::pub_underscore_fields, reason = "This is not a public API")]
   pub _pad: [i64; 4],
+}
+
+/// macOS `struct statfs` (the 64-bit/`INODE64` ABI, which is the only one on
+/// arm64). Only `f_bsize`, `f_blocks`, and `f_bavail` are read; the rest is
+/// declared to give the struct its correct size and field offsets.
+#[repr(C)]
+#[cfg(target_os = "macos")]
+pub struct StatfsBuf {
+  pub f_bsize:       u32,
+  pub f_iosize:      i32,
+  pub f_blocks:      u64,
+  pub f_bfree:       u64,
+  pub f_bavail:      u64,
+  pub f_files:       u64,
+  pub f_ffree:       u64,
+  pub f_fsid:        [i32; 2],
+  pub f_owner:       u32,
+  pub f_type:        u32,
+  pub f_flags:       u32,
+  pub f_fssubtype:   u32,
+  pub f_fstypename:  [i8; 16],
+  pub f_mntonname:   [i8; 1024],
+  pub f_mntfromname: [i8; 1024],
+  pub f_flags_ext:   u32,
+  pub f_reserved:    [u32; 7],
 }
 
 /// on s390x `f_type` and `f_bsize` are 32-bit.

@@ -1,13 +1,21 @@
 {
   lib,
+  stdenv,
   rustPlatform,
   llvm,
 }: let
   pname = "microfetch";
   toml = (lib.importTOML ../Cargo.toml).workspace.package;
   inherit (toml) version;
+  # On Linux the build drives the mold linker wrapper, which expects the
+  # LLVM/clang stdenv. macOS cannot link statically and uses the default
+  # (Apple clang) stdenv to link against libSystem instead.
+  stdenv' =
+    if stdenv.isDarwin
+    then rustPlatform.buildRustPackage
+    else rustPlatform.buildRustPackage.override {inherit (llvm) stdenv;};
 in
-  rustPlatform.buildRustPackage.override {inherit (llvm) stdenv;} (finalAttrs: {
+  stdenv' (finalAttrs: {
     __structuredAttrs = true;
 
     inherit pname version;
@@ -37,7 +45,8 @@ in
       description = "Microscopic fetch script in Rust, for NixOS systems";
       homepage = "https://github.com/NotAShelf/microfetch";
       license = lib.licenses.gpl3Only;
-      platforms = lib.platforms.linux;
+      # aarch64-darwin only: x86_64-darwin would mis-route to the Linux x86_64
+      platforms = lib.platforms.linux ++ ["aarch64-darwin"];
       maintainers = [lib.maintainers.NotAShelf];
       mainProgram = "microfetch";
     };

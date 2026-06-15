@@ -1,4 +1,6 @@
 {
+  lib,
+  stdenv,
   mkShell,
   cargo,
   rustc,
@@ -13,17 +15,19 @@
 mkShell {
   name = "microfetch";
   strictDeps = true;
-  nativeBuildInputs = [
-    cargo
-    rustc
-    mold
-    clang
+  nativeBuildInputs =
+    [
+      cargo
+      rustc
+      clang
 
-    rust-analyzer
-    (rustfmt.override {asNightly = true;})
-    clippy
-    taplo
+      rust-analyzer
+      (rustfmt.override {asNightly = true;})
+      clippy
+      taplo
 
-    gnuplot # for Criterion.rs plots
-  ];
+      gnuplot # for Criterion.rs plots
+    ]
+    # mold is the Linux linker wrapper; macOS uses the default linker.
+    ++ lib.optionals stdenv.isLinux [mold];
 }

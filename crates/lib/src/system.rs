@@ -1,11 +1,13 @@
 use alloc::string::String;
 use core::mem::MaybeUninit;
 
+#[cfg(target_os = "linux")]
+use crate::syscall::read_file_fast;
 use crate::{
   Error,
   UtsName,
   colors::Colors,
-  syscall::{StatfsBuf, read_file_fast, sys_statfs},
+  syscall::{StatfsBuf, sys_statfs},
 };
 
 #[must_use]
@@ -169,6 +171,7 @@ pub fn write_u64(s: &mut String, mut n: u64) {
 }
 
 /// Fast integer parsing without stdlib overhead
+#[cfg(target_os = "linux")]
 #[inline]
 fn parse_u64_fast(s: &[u8]) -> u64 {
   let mut result = 0u64;
@@ -182,11 +185,38 @@ fn parse_u64_fast(s: &[u8]) -> u64 {
   result
 }
 
+/// Gets the system memory usage information via `sysctl`/Mach (macOS).
+///
+/// # Errors
+///
+/// Returns an error if the memory statistics cannot be retrieved.
+#[cfg(target_os = "macos")]
+#[cfg_attr(feature = "hotpath", hotpath::measure)]
+pub fn get_memory_usage() -> Result<String, Error> {
+  let (used_bytes, total_bytes) =
+    crate::syscall::macos_meminfo().ok_or(Error::OsError(0))?;
+
+  const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
+  #[expect(
+    clippy::cast_precision_loss,
+    reason = "GiB display tolerates f64 rounding"
+  )]
+  let used_memory = used_bytes as f64 / GIB;
+  #[expect(
+    clippy::cast_precision_loss,
+    reason = "GiB display tolerates f64 rounding"
+  )]
+  let total_memory = total_bytes as f64 / GIB;
+
+  Ok(format_memory(used_memory, total_memory))
+}
+
 /// Gets the system memory usage information.
 ///
 /// # Errors
 ///
 /// Returns an error if `/proc/meminfo` cannot be read.
+#[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn get_memory_usage() -> Result<String, Error> {
   #[cfg_attr(feature = "hotpath", hotpath::measure)]
@@ -246,6 +276,11 @@ pub fn get_memory_usage() -> Result<String, Error> {
   }
 
   let (used_memory, total_memory) = parse_memory_info()?;
+  Ok(format_memory(used_memory, total_memory))
+}
+
+/// Formats `used`/`total` memory (both in GiB) into the display string.
+fn format_memory(used_memory: f64, total_memory: f64) -> String {
   #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
   let percentage_used = round_f64(used_memory / total_memory * 100.0) as u64;
 
@@ -264,5 +299,5 @@ pub fn get_memory_usage() -> Result<String, Error> {
   result.push_str(colors.reset);
   result.push(')');
 
-  Ok(result)
+  result
 }

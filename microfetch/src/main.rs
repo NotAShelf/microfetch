@@ -12,12 +12,18 @@
 
 extern crate alloc;
 
-use core::{arch::naked_asm, panic::PanicInfo};
+#[cfg(not(target_os = "macos"))] use core::arch::naked_asm;
+use core::panic::PanicInfo;
 
 use microfetch_alloc::BumpAllocator;
-use microfetch_asm::{entry_rust, sys_exit, sys_write};
-// Re-export libc replacement functions from asm crate
+// The custom `_start` (and the `entry_rust` it calls) is Linux-only.
+#[cfg(not(target_os = "macos"))]
+use microfetch_asm::entry_rust;
+// Re-export libc replacement functions from asm crate. On macOS these are
+// provided by libSystem, so we don't define (or re-export) our own.
+#[cfg(not(target_os = "macos"))]
 pub use microfetch_asm::{memcpy, memset, strlen};
+use microfetch_asm::{sys_exit, sys_write};
 
 #[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
@@ -51,7 +57,9 @@ unsafe extern "C" fn _start() {
   );
 }
 
-#[cfg(target_arch = "aarch64")]
+// Linux aarch64 only. On macOS the C runtime provides the entry point and
+// calls `main` directly, so no custom `_start` (or raw `svc` exit) is used.
+#[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
 #[unsafe(no_mangle)]
 #[unsafe(naked)]
 unsafe extern "C" fn _start() {

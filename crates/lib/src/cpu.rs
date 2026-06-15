@@ -1,11 +1,33 @@
 use alloc::string::String;
 
-use crate::{Error, syscall::read_file_fast, system::write_u64};
+#[cfg(target_os = "linux")]
+use crate::syscall::read_file_fast;
+use crate::{Error, system::write_u64};
 
 /// Gets CPU model name (trimmed), or empty string if unavailable.
+#[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn get_cpu_name() -> String {
   get_model_name().unwrap_or_default()
+}
+
+/// Gets CPU model name from `machdep.cpu.brand_string` (macOS),
+/// e.g. `Apple M2 Pro`. Returns an empty string if unavailable.
+#[cfg(target_os = "macos")]
+#[cfg_attr(feature = "hotpath", hotpath::measure)]
+pub fn get_cpu_name() -> String {
+  let mut buf = [0u8; 128];
+  match crate::syscall::macos_sysctl_str(
+    b"machdep.cpu.brand_string\0",
+    &mut buf,
+  ) {
+    Some(n) => {
+      core::str::from_utf8(&buf[..n])
+        .map(String::from)
+        .unwrap_or_default()
+    },
+    None => String::new(),
+  }
 }
 
 /// Gets CPU core/thread info as a string.
@@ -16,17 +38,54 @@ pub fn get_cpu_name() -> String {
 /// # Errors
 ///
 /// Returns an error if the thread count cannot be determined.
+#[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn get_cpu_cores() -> Result<String, Error> {
   let threads = get_thread_count()?;
   let cores = get_core_count(threads);
+  Ok(format_cores(cores, get_pe_cores(), threads))
+}
 
+/// Gets CPU core/thread info via `sysctl` (macOS).
+///
+/// On Apple Silicon `hw.perflevel0`/`hw.perflevel1` expose the performance
+/// (P) and efficiency (E) core counts respectively.
+///
+/// # Errors
+///
+/// Returns an error if the logical CPU count cannot be determined.
+#[cfg(target_os = "macos")]
+#[cfg_attr(feature = "hotpath", hotpath::measure)]
+pub fn get_cpu_cores() -> Result<String, Error> {
+  use crate::syscall::macos_sysctl_u32;
+
+  let threads =
+    macos_sysctl_u32(b"hw.logicalcpu\0").ok_or(Error::OsError(0))?;
+  let cores = macos_sysctl_u32(b"hw.physicalcpu\0").unwrap_or(threads);
+
+  // Performance/efficiency split (Apple Silicon). Only reported when both
+  // perf levels are present.
+  let pe = match (
+    macos_sysctl_u32(b"hw.perflevel0.physicalcpu\0"),
+    macos_sysctl_u32(b"hw.perflevel1.physicalcpu\0"),
+  ) {
+    (Some(p), Some(e)) => Some((p, e)),
+    _ => None,
+  };
+
+  Ok(format_cores(cores, pe, threads))
+}
+
+/// Formats core/thread counts identically across platforms:
+/// `{cores} cores ({p}p/{e}e), {threads} threads`, omitting the P/E group and
+/// the thread suffix when not applicable.
+fn format_cores(cores: u32, pe: Option<(u32, u32)>, threads: u32) -> String {
   let mut result = String::new();
 
   write_u64(&mut result, u64::from(cores));
   result.push_str(" cores");
 
-  if let Some((p, e)) = get_pe_cores() {
+  if let Some((p, e)) = pe {
     result.push_str(" (");
     write_u64(&mut result, u64::from(p));
     result.push_str("p/");
@@ -40,10 +99,11 @@ pub fn get_cpu_cores() -> Result<String, Error> {
     result.push_str(" threads");
   }
 
-  Ok(result)
+  result
 }
 
 /// Count online threads via `sched_getaffinity(2)`.
+#[cfg(target_os = "linux")]
 fn get_thread_count() -> Result<u32, Error> {
   let mut mask = [0u8; 128];
   let ret = unsafe {
@@ -63,6 +123,7 @@ fn get_thread_count() -> Result<u32, Error> {
 }
 
 /// Derive physical core count from thread count and topology.
+#[cfg(target_os = "linux")]
 fn get_core_count(threads: u32) -> u32 {
   let Some(smt_width) =
     count_cpulist("/sys/devices/system/cpu/cpu0/topology/thread_siblings_list")
@@ -77,6 +138,7 @@ fn get_core_count(threads: u32) -> u32 {
 
 /// Detect P-core and E-core counts via sysfs PMU device files, which is done
 /// by reading `/sys/devices/cpu_core/cpus` and `/sys/devices/cpu_atom/cpus`.
+#[cfg(target_os = "linux")]
 fn get_pe_cores() -> Option<(u32, u32)> {
   let p = count_cpulist("/sys/devices/cpu_core/cpus")?;
   let e = count_cpulist("/sys/devices/cpu_atom/cpus").unwrap_or(0);
@@ -84,6 +146,7 @@ fn get_pe_cores() -> Option<(u32, u32)> {
 }
 
 /// Parse a cpulist file and count listed CPUs.
+#[cfg(target_os = "linux")]
 fn count_cpulist(path: &str) -> Option<u32> {
   let mut buf = [0u8; 64];
   let n = read_file_fast(path, &mut buf).ok()?;
@@ -112,6 +175,7 @@ fn count_cpulist(path: &str) -> Option<u32> {
 }
 
 /// Parse a decimal number from a byte slice, advancing the index.
+#[cfg(target_os = "linux")]
 fn parse_num(data: &[u8], i: &mut usize) -> u32 {
   let mut n = 0u32;
   while *i < data.len() && data[*i].is_ascii_digit() {
@@ -123,6 +187,7 @@ fn parse_num(data: &[u8], i: &mut usize) -> u32 {
 
 /// Build `/sys/devices/system/cpu/cpu{n}/cpufreq/cpuinfo_max_freq` into buf,
 /// returning the byte length written.
+#[cfg(target_os = "linux")]
 fn format_cpufreq_path(buf: &mut [u8; 64], cpu: u32) -> usize {
   const PREFIX: &[u8] = b"/sys/devices/system/cpu/cpu";
   const SUFFIX: &[u8] = b"/cpufreq/cpuinfo_max_freq";
@@ -149,6 +214,7 @@ fn format_cpufreq_path(buf: &mut [u8; 64], cpu: u32) -> usize {
 }
 
 /// Read CPU frequency in MHz. Tries sysfs first, then cpuinfo fields.
+#[cfg(target_os = "linux")]
 fn get_cpu_freq_mhz() -> Option<u32> {
   // Read cpuinfo_max_freq across all CPUs (in kHz) and take the max so
   // heterogeneous (big.LITTLE) topologies report the performance cluster.
@@ -247,6 +313,7 @@ fn get_cpu_freq_mhz() -> Option<u32> {
 }
 
 /// Parse CPU model name from `/proc/cpuinfo` and append frequency.
+#[cfg(target_os = "linux")]
 fn get_model_name() -> Option<String> {
   let mut buf = [0u8; 2048];
   let n = read_file_fast("/proc/cpuinfo", &mut buf).ok()?;
@@ -275,6 +342,7 @@ fn get_model_name() -> Option<String> {
 /// Extract a human-readable CPU name. Tries cpuinfo fields first, then
 /// falls back to the device-tree `compatible` string on SoCs that don't
 /// expose a model through cpuinfo.
+#[cfg(target_os = "linux")]
 fn extract_name(data: &[u8]) -> Option<String> {
   for key in &[
     b"model name" as &[u8],
@@ -300,6 +368,7 @@ fn extract_name(data: &[u8]) -> Option<String> {
 /// The file holds NUL-separated `vendor,model` strings from most-specific
 /// (board) to most-generic (SoC); we take the last entry and return just
 /// the model portion after the comma.
+#[cfg(target_os = "linux")]
 fn parse_dt_compatible() -> Option<String> {
   let mut buf = [0u8; 256];
   let n = read_file_fast("/sys/firmware/devicetree/base/compatible", &mut buf)
@@ -320,6 +389,7 @@ fn parse_dt_compatible() -> Option<String> {
 }
 
 /// Extract value of first occurrence of `key` in cpuinfo.
+#[cfg(target_os = "linux")]
 fn extract_field<'a>(data: &'a [u8], key: &[u8]) -> Option<&'a str> {
   let mut i = 0;
   while i < data.len() {
@@ -350,6 +420,7 @@ fn extract_field<'a>(data: &'a [u8], key: &[u8]) -> Option<&'a str> {
 }
 
 /// Strip noise from model names.
+#[cfg(target_os = "linux")]
 fn trim(name: &str) -> &str {
   let b = name.as_bytes();
   let mut end = b.len();

@@ -2,6 +2,14 @@ fn main() {
   // These flags only apply to the microfetch binary, not to proc-macro crates
   // or other host-compiled artifacts.
 
+  // macOS cannot link statically, requires the standard C runtime startup, and
+  // uses Mach-O (not ELF), so none of the flags below apply. The default
+  // linker driver produces a correct (and ad-hoc code-signed) binary there.
+  let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+  if target_os == "macos" {
+    return;
+  }
+
   // No C runtime, we provide _start ourselves
   println!("cargo:rustc-link-arg-bin=microfetch=-nostartfiles");
   // Fully static, no dynamic linker, no .interp/.dynsym/.dynamic overhead
