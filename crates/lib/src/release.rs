@@ -1,6 +1,8 @@
 use alloc::string::String;
 
-use crate::{Error, UtsName, syscall::read_file_fast};
+#[cfg(target_os = "linux")]
+use crate::syscall::read_file_fast;
+use crate::{Error, UtsName};
 
 #[must_use]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
@@ -24,11 +26,36 @@ pub fn get_system_info(utsname: &UtsName) -> String {
   result
 }
 
+/// Gets the pretty name of the OS via `kern.osproductversion` (macOS),
+/// e.g. `macOS 14.5`.
+///
+/// # Errors
+///
+/// Never errors; falls back to `macOS` if the version sysctl is unavailable.
+#[cfg(target_os = "macos")]
+#[cfg_attr(feature = "hotpath", hotpath::measure)]
+pub fn get_os_pretty_name() -> Result<String, Error> {
+  let mut name = String::from("macOS");
+  let mut buf = [0u8; 64];
+  if let Some(n) =
+    crate::syscall::macos_sysctl_str(b"kern.osproductversion\0", &mut buf)
+  {
+    if let Ok(ver) = core::str::from_utf8(&buf[..n]) {
+      if !ver.is_empty() {
+        name.push(' ');
+        name.push_str(ver);
+      }
+    }
+  }
+  Ok(name)
+}
+
 /// Gets the pretty name of the OS from `/etc/os-release`.
 ///
 /// # Errors
 ///
 /// Returns an error if `/etc/os-release` cannot be read.
+#[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn get_os_pretty_name() -> Result<String, Error> {
   // Fast byte-level scanning for PRETTY_NAME=

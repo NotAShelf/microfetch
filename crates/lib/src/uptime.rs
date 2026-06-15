@@ -1,7 +1,6 @@
 use alloc::string::String;
-use core::mem::MaybeUninit;
 
-use crate::{Error, syscall::sys_sysinfo};
+use crate::Error;
 
 /// Faster integer to string conversion without the formatting overhead.
 #[inline]
@@ -26,11 +25,14 @@ fn itoa(mut n: u64, buf: &mut [u8]) -> &str {
 /// # Errors
 ///
 /// Returns an error if the system uptime cannot be retrieved.
+#[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn get_current() -> Result<String, Error> {
+  use core::mem::MaybeUninit;
+
   let uptime_seconds = {
     let mut info = MaybeUninit::uninit();
-    if unsafe { sys_sysinfo(info.as_mut_ptr()) } != 0 {
+    if unsafe { crate::syscall::sys_sysinfo(info.as_mut_ptr()) } != 0 {
       return Err(Error::last_os_error());
     }
     #[allow(clippy::cast_sign_loss)]
@@ -39,6 +41,24 @@ pub fn get_current() -> Result<String, Error> {
     }
   };
 
+  Ok(format_uptime(uptime_seconds))
+}
+
+/// Gets the current system uptime via `kern.boottime` (macOS).
+///
+/// # Errors
+///
+/// Returns an error if the uptime cannot be retrieved.
+#[cfg(target_os = "macos")]
+#[cfg_attr(feature = "hotpath", hotpath::measure)]
+pub fn get_current() -> Result<String, Error> {
+  let uptime_seconds =
+    crate::syscall::macos_uptime_secs().ok_or(Error::OsError(0))?;
+  Ok(format_uptime(uptime_seconds))
+}
+
+/// Formats a duration in seconds as a human-readable uptime string.
+fn format_uptime(uptime_seconds: u64) -> String {
   let days = uptime_seconds / 86400;
   let hours = (uptime_seconds / 3600) % 24;
   let minutes = (uptime_seconds / 60) % 60;
@@ -68,5 +88,5 @@ pub fn get_current() -> Result<String, Error> {
     result.push_str("less than a minute");
   }
 
-  Ok(result)
+  result
 }
