@@ -204,6 +204,14 @@ fn get_cpu_freq_mhz() -> Option<u32> {
           mhz = mhz * 10 + u32::from(b - b'0');
         }
       }
+
+      // Octeon presets loops_per_jiffy to clock_rate/HZ, so its BogoMIPS is
+      // exactly 2x the core clock, unlike the 1:1 of other MIPS.
+      // https://github.com/torvalds/linux/blob/v6.19/arch/mips/cavium-octeon/csrc-octeon.c#L40
+      if *key == b"BogoMIPS" && data.windows(6).any(|w| w == b"Octeon") {
+        mhz /= 2;
+      }
+
       if mhz > 0 {
         return Some(mhz);
       }
