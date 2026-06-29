@@ -11,7 +11,7 @@ repository             = "https://github.com/notashelf/microfetch"
 publish                = true
 
 [dependencies]
-hotpath                    = { optional = true, version = "0.16.1" }
+hotpath                    = { optional = true, version = "0.18.0" }
 microfetch-alloc.workspace = true
 microfetch-asm.workspace   = true
 microfetch-lib.workspace   = true
