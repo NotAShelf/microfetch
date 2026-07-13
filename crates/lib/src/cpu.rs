@@ -7,6 +7,7 @@ use crate::{Error, system::write_u64};
 /// Gets CPU model name (trimmed), or empty string if unavailable.
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
+#[must_use] 
 pub fn get_cpu_name() -> String {
   get_model_name().unwrap_or_default()
 }
@@ -340,7 +341,7 @@ fn get_model_name() -> Option<String> {
 }
 
 /// Extract a human-readable CPU name. Tries cpuinfo fields first, then
-/// falls back to the device-tree `compatible` string on SoCs that don't
+/// falls back to the device-tree `compatible` string on `SoCs` that don't
 /// expose a model through cpuinfo.
 #[cfg(target_os = "linux")]
 fn extract_name(data: &[u8]) -> Option<String> {
@@ -364,9 +365,9 @@ fn extract_name(data: &[u8]) -> Option<String> {
   parse_dt_compatible()
 }
 
-/// Parse the SoC name from `/sys/firmware/devicetree/base/compatible`.
+/// Parse the `SoC` name from `/sys/firmware/devicetree/base/compatible`.
 /// The file holds NUL-separated `vendor,model` strings from most-specific
-/// (board) to most-generic (SoC); we take the last entry and return just
+/// (board) to most-generic (`SoC`); we take the last entry and return just
 /// the model portion after the comma.
 #[cfg(target_os = "linux")]
 fn parse_dt_compatible() -> Option<String> {
