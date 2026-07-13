@@ -3,7 +3,6 @@ name                   = "microfetch-alloc"
 description            = "Simple, std-free bump allocator for Microfetch"
 version.workspace      = true
 edition.workspace      = true
-authors.workspace      = true
 rust-version.workspace = true
 license.workspace      = true
 publish                = false

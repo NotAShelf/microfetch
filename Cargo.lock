@@ -483,7 +483,7 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "microfetch"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "hotpath",
  "microfetch-alloc",
@@ -493,15 +493,15 @@ dependencies = [
 
 [[package]]
 name = "microfetch-alloc"
-version = "1.1.0"
+version = "1.2.0"
 
 [[package]]
 name = "microfetch-asm"
-version = "1.1.0"
+version = "1.2.0"
 
 [[package]]
 name = "microfetch-bench"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "criterion",
  "criterion-cycles-per-byte",
@@ -510,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "microfetch-lib"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "hotpath",
  "microfetch-asm",
