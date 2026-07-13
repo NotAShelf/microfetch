@@ -5,16 +5,27 @@ use crate::getenv_str;
 #[must_use]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn get_desktop_info() -> String {
-  let desktop_raw = getenv_str("XDG_CURRENT_DESKTOP").unwrap_or("Unknown");
-  let session_raw = getenv_str("XDG_SESSION_TYPE").unwrap_or("");
+  let desktop_raw = getenv_str("XDG_CURRENT_DESKTOP");
+  let session_raw = getenv_str("XDG_SESSION_TYPE");
 
-  let desktop_str = desktop_raw.strip_prefix("none+").unwrap_or(desktop_raw);
+  let desktop_str = desktop_raw.map_or_else(
+    || {
+      if cfg!(target_os = "macos") {
+        "Aqua"
+      } else {
+        "Unknown"
+      }
+    },
+    |s| s.strip_prefix("none+").unwrap_or(s),
+  );
 
-  let backend_str = if session_raw.is_empty() {
-    "Unknown"
-  } else {
-    session_raw
-  };
+  let backend_str = session_raw.unwrap_or({
+    if cfg!(target_os = "macos") {
+      "Quartz"
+    } else {
+      "Unknown"
+    }
+  });
 
   // Pre-calculate capacity: desktop_len + " (" + backend_len + ")"
   // Capitalize first char needs temporary allocation only if backend exists
