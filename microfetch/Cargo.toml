@@ -9,6 +9,10 @@ readme                 = "../docs/README.md"
 repository             = "https://github.com/notashelf/microfetch"
 publish                = true
 
+[[bin]]
+name       = "microfetch"
+test       = false
+
 [dependencies]
 hotpath                    = { optional = true, version = "0.21.2" }
 microfetch-alloc.workspace = true
