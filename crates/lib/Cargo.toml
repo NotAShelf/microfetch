@@ -9,7 +9,7 @@ license.workspace      = true
 publish                = false
 
 [dependencies]
-hotpath                  = { optional = true, version = "0.20.0" }
+hotpath                  = { optional = true, version = "0.21.2" }
 microfetch-asm.workspace = true
 
 [features]
