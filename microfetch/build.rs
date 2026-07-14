@@ -14,6 +14,10 @@ fn main() {
   println!("cargo:rustc-link-arg-bin=microfetch=-nostartfiles");
   // Fully static, no dynamic linker, no .interp/.dynsym/.dynamic overhead
   println!("cargo:rustc-link-arg-bin=microfetch=-static");
+  // Clang ignores Rust's PIE selection flag for fully static links.
+  println!(
+    "cargo:rustc-link-arg-bin=microfetch=-Wno-unused-command-line-argument"
+  );
   // Remove unreferenced input sections
   println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--gc-sections");
   // Strip all symbol table entries
