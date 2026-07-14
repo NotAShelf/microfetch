@@ -4,7 +4,7 @@
   mkShell,
   cargo,
   rustc,
-  mold,
+  wild,
   clang,
   rust-analyzer,
   rustfmt,
@@ -28,6 +28,5 @@ mkShell {
 
       gnuplot # for Criterion.rs plots
     ]
-    # mold is the Linux linker wrapper; macOS uses the default linker.
-    ++ lib.optionals stdenv.isLinux [mold];
+    ++ lib.optionals stdenv.isLinux [wild];
 }

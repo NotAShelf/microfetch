@@ -73,8 +73,10 @@ jobs:
       if: ${{ !matrix.build_std }}
       run: rustup target add ${{ matrix.target }}
 
-    - name: "Make Mold the default linker"
-      uses: rui314/setup-mold@v1
+    - name: "Install the wild linker"
+      uses: wild-linker/action@0.9.0
+    - name: "Put wild on PATH"
+      run: echo "$RUNNER_TEMP/wild-install" >> "$GITHUB_PATH"
 
     - name: "Setup cross-compilation toolchain"
       uses: taiki-e/setup-cross-toolchain-action@v1

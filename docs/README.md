@@ -59,7 +59,8 @@ welcome to use it on your system: it is pretty _[fast](#benchmarks)_...
 - Respects [`NO_COLOR` spec](https://no-color.org/)
 - Funny [^1]
 
-[^1]: I don't know how else to describe the (unhealthy) amount of handwritten
+[^1]:
+    I don't know how else to describe the (unhealthy) amount of handwritten
     assembly that was written in order to make Microfetch faster.
 
 ## Motivation
@@ -234,7 +235,7 @@ interested in Microfetch tailored to their distributions.
 
 ## Customizing
 
-You can't*
+You can't\*
 
 ### Really?
 
@@ -302,16 +303,18 @@ A Nix flake is provided. You may use `nix develop` to get started. Direnv users
 may instead run `direnv allow` to get a complete environment with shell
 integration.
 
-Non-Nix user will need `cargo`, `clang` and `mold` installed on their system to
-build Microfetch. As Mold seems to yield _slightly_ better results than the
-default linker, it has been set as the default in `.cargo/config.toml` for
-x86-64 Linux. You may override those defaults using the `RUSTFLAGS` environment
-variable. For example:
+Non-Nix users will need `cargo`, `clang` and [`wild`] on their `PATH` to build
+Microfetch. `wild` is faster than the default linker and emits a tighter binary,
+so it is set as the linker (via `clang`) in `.cargo/config.toml` for x86-64 and
+aarch64 Linux. To use a different linker, override it with the `RUSTFLAGS`
+environment variable. For example:
 
 ```sh
-# Use ld instead of Mold
+# Use ld instead of wild
 $ RUSTFLAGS="-C linker=/path/to/ld.lld" cargo build
 ```
+
+[`wild`]: https://github.com/wild-linker/wild
 
 ## Thanks
 

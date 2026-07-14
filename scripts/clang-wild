@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Link via clang+wild. Wild sits behind the linker (not a rustflag) so a
+# cross-toolchain that overrides the linker drops it instead of choking on
+# --ld-path. Needs clang and wild on PATH.
+exec clang --ld-path=wild "$@"

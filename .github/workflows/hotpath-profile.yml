@@ -19,8 +19,10 @@ jobs:
         with:
           rustflags: ""
 
-      - name: Make Mold the default linker
-        uses: rui314/setup-mold@v1
+      - name: Install the wild linker
+        uses: wild-linker/action@0.9.0
+      - name: Put wild on PATH
+        run: echo "$RUNNER_TEMP/wild-install" >> "$GITHUB_PATH"
 
       - name: Create metrics directory
         run: mkdir -p /tmp/metrics
