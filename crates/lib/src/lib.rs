@@ -200,20 +200,20 @@ impl UtsName {
 
 /// Minimal, stack-allocated writer.
 pub struct StackWriter<'a> {
-  buf: &'a mut [u8],
+  buf: &'a mut [MaybeUninit<u8>],
   pos: usize,
 }
 
 impl<'a> StackWriter<'a> {
   #[inline]
-  pub const fn new(buf: &'a mut [u8]) -> Self {
+  pub const fn new(buf: &'a mut [MaybeUninit<u8>]) -> Self {
     Self { buf, pos: 0 }
   }
 
   #[inline]
   #[must_use]
   pub fn written(&self) -> &[u8] {
-    &self.buf[..self.pos]
+    unsafe { core::slice::from_raw_parts(self.buf.as_ptr().cast(), self.pos) }
   }
 
   #[inline]
@@ -221,17 +221,23 @@ impl<'a> StackWriter<'a> {
     self.push_bytes(s.as_bytes());
   }
 
-  #[inline]
+  #[inline(never)]
   pub fn push_bytes(&mut self, bytes: &[u8]) {
     let n = bytes.len().min(self.buf.len() - self.pos);
-    self.buf[self.pos..self.pos + n].copy_from_slice(&bytes[..n]);
+    unsafe {
+      core::ptr::copy_nonoverlapping(
+        bytes.as_ptr(),
+        self.buf.as_mut_ptr().add(self.pos).cast(),
+        n,
+      );
+    }
     self.pos += n;
   }
 
   #[inline]
   pub fn push_byte(&mut self, b: u8) {
     if self.pos < self.buf.len() {
-      self.buf[self.pos] = b;
+      self.buf[self.pos].write(b);
       self.pos += 1;
     }
   }
@@ -275,97 +281,48 @@ const CUSTOM_LOGO: &str = match option_env!("MICROFETCH_LOGO") {
 /// Packed logo rows. `0` separates rows; `1` and `2` select colors.
 const LOGO: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/logo.bin"));
 
-/// Write the default two-tone NixOS braille logo for one row, advancing
-/// `logo` past the row separator so the next call resumes where this left off.
+/// Write one row from a packed color-marked byte stream.
 #[inline(never)]
-fn write_logo(w: &mut StackWriter, c: &colors::Colors, logo: &mut &[u8]) {
-  let colors = [c.blue, c.cyan];
-  let row_data = *logo;
+fn write_styled_row(
+  w: &mut StackWriter,
+  c: &colors::Colors,
+  stream: &mut &[u8],
+) {
+  let colors = [c.blue, c.cyan, c.reset];
+  let data = *stream;
+  let row_end = data.iter().position(|&b| b == 0).unwrap_or(data.len());
+  let row_data = &data[..row_end];
+  *stream = data.get(row_end + 1..).unwrap_or(&[]);
 
   let mut i = 0;
   while i < row_data.len() {
-    match row_data[i] {
-      0 => {
+    if let marker @ 1..=3 = row_data[i] {
+      w.push_str(colors[(marker - 1) as usize]);
+      i += 1;
+    } else {
+      let chunk_start = i;
+      while i < row_data.len() && row_data[i] > 3 {
         i += 1;
-        break;
-      },
-      1 | 2 => {
-        w.push_str(colors[(row_data[i] - 1) as usize]);
-        i += 1;
-      },
-      _ => {
-        let chunk_start = i;
-        while i < row_data.len() && row_data[i] > 2 {
-          i += 1;
-        }
-        w.push_bytes(&row_data[chunk_start..i]);
-      },
+      }
+      w.push_bytes(&row_data[chunk_start..i]);
     }
   }
-  *logo = &row_data[i..];
-  w.push_str(c.reset);
 }
 
-// Info row labels
-struct RowLabel {
-  icon:    &'static str,
-  key:     &'static str,
-  spacing: &'static str,
-}
-
-const ROW_LABELS: [Option<RowLabel>; 11] = [
-  None, // row 0: user@host
-  Some(RowLabel {
-    icon:    "\u{F313}  ",
-    key:     "System",
-    spacing: "       \u{E621} ",
-  }),
-  Some(RowLabel {
-    icon:    "\u{E712}  ",
-    key:     "Kernel",
-    spacing: "       \u{E621} ",
-  }),
-  Some(RowLabel {
-    icon:    "\u{F2DB}  ",
-    key:     "CPU",
-    spacing: "          \u{E621} ",
-  }),
-  Some(RowLabel {
-    icon:    "\u{F4BC}  ",
-    key:     "Topology",
-    spacing: "     \u{E621} ",
-  }),
-  Some(RowLabel {
-    icon:    "\u{E795}  ",
-    key:     "Shell",
-    spacing: "        \u{E621} ",
-  }),
-  Some(RowLabel {
-    icon:    "\u{F017}  ",
-    key:     "Uptime",
-    spacing: "       \u{E621} ",
-  }),
-  Some(RowLabel {
-    icon:    "\u{F2D2}  ",
-    key:     "Desktop",
-    spacing: "      \u{E621} ",
-  }),
-  Some(RowLabel {
-    icon:    "\u{F035B}  ",
-    key:     "Memory",
-    spacing: "       \u{E621} ",
-  }),
-  Some(RowLabel {
-    icon:    "\u{F194E}  ",
-    key:     "Storage (/)",
-    spacing: "  \u{E621} ",
-  }),
-  Some(RowLabel {
-    icon:    "\u{E22B}  ",
-    key:     "Colors",
-    spacing: "       \u{E621} ",
-  }),
-];
+const ROW_COUNT: usize = 11;
+const ROW_LABELS: &[u8] = concat!(
+  "\x02\u{F313}  \x01System\x03       \u{E621} \0",
+  "\x02\u{E712}  \x01Kernel\x03       \u{E621} \0",
+  "\x02\u{F2DB}  \x01CPU\x03          \u{E621} \0",
+  "\x02\u{F4BC}  \x01Topology\x03     \u{E621} \0",
+  "\x02\u{E795}  \x01Shell\x03        \u{E621} \0",
+  "\x02\u{F017}  \x01Uptime\x03       \u{E621} \0",
+  "\x02\u{F2D2}  \x01Desktop\x03      \u{E621} \0",
+  "\x02\u{F035B}  \x01Memory\x03       \u{E621} \0",
+  "\x02\u{F194E}  \x01Storage (/)\x03  \u{E621} \0",
+  "\x02\u{E22B}  \x01Colors\x03       \u{E621} \0",
+)
+.as_bytes();
 
 /// Write one row: logo + label + value.
 #[inline(never)]
@@ -373,32 +330,52 @@ const ROW_LABELS: [Option<RowLabel>; 11] = [
 fn write_row(
   w: &mut StackWriter,
   c: &colors::Colors,
-  custom_logo: &str,
-  use_custom: bool,
+  row: usize,
+  custom_logo: Option<&str>,
   logo: &mut &[u8],
-  label: &Option<RowLabel>,
-  write_value: &mut dyn FnMut(&mut StackWriter),
-  suffix: &str,
+  labels: &mut &[u8],
+  utsname: &UtsName,
 ) {
   w.push_str("    ");
-  if use_custom {
+  if let Some(custom_logo) = custom_logo {
     w.push_str(c.cyan);
     w.push_str(custom_logo);
     w.push_str(c.reset);
   } else {
-    write_logo(w, c, logo);
+    write_styled_row(w, c, logo);
+    w.push_str(c.reset);
   }
   w.push_str("  ");
-  if let Some(l) = label {
-    w.push_str(c.cyan);
-    w.push_str(l.icon);
-    w.push_str(c.blue);
-    w.push_str(l.key);
-    w.push_str(c.reset);
-    w.push_str(l.spacing);
+  if row != 0 {
+    write_styled_row(w, c, labels);
   }
-  write_value(w);
-  w.push_str(suffix);
+  match row {
+    0 => {
+      system::write_username_and_hostname(w, c, utsname);
+      w.push_str(" ~");
+      w.push_str(c.reset);
+    },
+    1 => {
+      let _ = release::write_os_pretty_name(w);
+    },
+    2 => release::write_system_info(w, utsname),
+    3 => cpu::write_cpu_name(w),
+    4 => {
+      let _ = cpu::write_cpu_cores(w);
+    },
+    5 => system::write_shell(w),
+    6 => {
+      let _ = uptime::write_uptime(w);
+    },
+    7 => desktop::write_desktop_info(w),
+    8 => {
+      let _ = system::write_memory_usage(w, c);
+    },
+    9 => {
+      let _ = system::write_root_disk_usage(w, c);
+    },
+    _ => colors::write_dots(w, c),
+  }
   w.push_byte(b'\n');
 }
 
@@ -463,7 +440,7 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
   let no_color = colors::is_no_color();
   let c = colors::Colors::new(no_color);
 
-  let mut buf = [0u8; 2560];
+  let mut buf = [MaybeUninit::uninit(); 2560];
   let mut w = StackWriter::new(&mut buf);
 
   // Custom logo is 11 lines from MICROFETCH_LOGO env var, one per info row.
@@ -478,103 +455,21 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
     &[""; 11] // unused, we use LOGO pairs below
   };
   let mut logo = LOGO;
+  let mut labels = ROW_LABELS;
 
   w.push_byte(b'\n');
 
-  macro_rules! row {
-    ($idx:expr, $write_value:expr, $suffix:expr) => {
-      write_row(
-        &mut w,
-        &c,
-        if use_custom { logo_lines[$idx] } else { "" },
-        use_custom,
-        &mut logo,
-        &ROW_LABELS[$idx],
-        &mut $write_value,
-        $suffix,
-      );
-    };
+  for row in 0..ROW_COUNT {
+    write_row(
+      &mut w,
+      &c,
+      row,
+      use_custom.then_some(logo_lines[row]),
+      &mut logo,
+      &mut labels,
+      &utsname,
+    );
   }
-
-  row!(
-    0,
-    |w: &mut StackWriter| {
-      system::write_username_and_hostname(w, &c, &utsname);
-      w.push_str(" ~");
-      w.push_str(c.reset);
-    },
-    ""
-  );
-  row!(
-    1,
-    |w: &mut StackWriter| {
-      let _ = release::write_os_pretty_name(w);
-    },
-    ""
-  );
-  row!(
-    2,
-    |w: &mut StackWriter| {
-      release::write_system_info(w, &utsname);
-    },
-    ""
-  );
-  row!(
-    3,
-    |w: &mut StackWriter| {
-      cpu::write_cpu_name(w);
-    },
-    ""
-  );
-  row!(
-    4,
-    |w: &mut StackWriter| {
-      let _ = cpu::write_cpu_cores(w);
-    },
-    ""
-  );
-  row!(
-    5,
-    |w: &mut StackWriter| {
-      system::write_shell(w);
-    },
-    ""
-  );
-  row!(
-    6,
-    |w: &mut StackWriter| {
-      let _ = uptime::write_uptime(w);
-    },
-    ""
-  );
-  row!(
-    7,
-    |w: &mut StackWriter| {
-      desktop::write_desktop_info(w);
-    },
-    ""
-  );
-  row!(
-    8,
-    |w: &mut StackWriter| {
-      let _ = system::write_memory_usage(w, &c);
-    },
-    ""
-  );
-  row!(
-    9,
-    |w: &mut StackWriter| {
-      let _ = system::write_root_disk_usage(w, &c);
-    },
-    ""
-  );
-  row!(
-    10,
-    |w: &mut StackWriter| {
-      colors::write_dots(w, &c);
-    },
-    ""
-  );
 
   w.push_byte(b'\n');
 
@@ -592,4 +487,29 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
   }
 
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn stack_writer_truncates_at_capacity() {
+    let mut buf = [MaybeUninit::uninit(); 4];
+    let mut writer = StackWriter::new(&mut buf);
+    writer.push_bytes(b"abc");
+    writer.push_byte(b'd');
+    writer.push_str("overflow");
+    assert_eq!(writer.written(), b"abcd");
+  }
+
+  #[test]
+  fn styled_rows_advance_the_stream() {
+    let mut buf = [MaybeUninit::uninit(); 3];
+    let mut writer = StackWriter::new(&mut buf);
+    let mut rows = &b"\x02a\x01b\x03c\0tail"[..];
+    write_styled_row(&mut writer, &colors::Colors::new(true), &mut rows);
+    assert_eq!(writer.written(), b"abc");
+    assert_eq!(rows, b"tail");
+  }
 }

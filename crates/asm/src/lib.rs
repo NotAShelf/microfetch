@@ -20,6 +20,8 @@
   feature(asm_experimental_arch)
 )]
 
+#[cfg(not(target_os = "macos"))] use core::ffi::c_void;
+
 // Per-arch syscall implementations live in their own module files.
 // macOS is matched first; there `target_arch` is `aarch64`, but the
 // implementation is libSystem-backed rather than raw `svc` traps.
@@ -63,13 +65,15 @@ pub use arch::{
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memcpy(
-  dest: *mut u8,
-  src: *const u8,
+  dest: *mut c_void,
+  src: *const c_void,
   n: usize,
-) -> *mut u8 {
+) -> *mut c_void {
+  let dest_bytes = dest.cast::<u8>();
+  let src_bytes = src.cast::<u8>();
   for i in 0..n {
     unsafe {
-      *dest.add(i) = *src.add(i);
+      *dest_bytes.add(i) = *src_bytes.add(i);
     }
   }
   dest
@@ -83,10 +87,16 @@ pub unsafe extern "C" fn memcpy(
 /// The value in `c` is treated as unsigned (lower 8 bits used).
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8 {
+pub unsafe extern "C" fn memset(
+  s: *mut c_void,
+  c: i32,
+  n: usize,
+) -> *mut c_void {
+  let bytes = s.cast::<u8>();
+  let value = c.to_le_bytes()[0];
   for i in 0..n {
     unsafe {
-      *s.add(i) = u8::try_from(c).unwrap_or(0);
+      *bytes.add(i) = value;
     }
   }
   s
@@ -99,10 +109,16 @@ pub unsafe extern "C" fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8 {
 /// `s1` and `s2` must be valid pointers to memory of at least `n` bytes.
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn bcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
+pub unsafe extern "C" fn bcmp(
+  s1: *const c_void,
+  s2: *const c_void,
+  n: usize,
+) -> i32 {
+  let bytes1 = s1.cast::<u8>();
+  let bytes2 = s2.cast::<u8>();
   for i in 0..n {
-    let a = unsafe { *s1.add(i) };
-    let b = unsafe { *s2.add(i) };
+    let a = unsafe { *bytes1.add(i) };
+    let b = unsafe { *bytes2.add(i) };
     if a != b {
       return i32::from(a) - i32::from(b);
     }
@@ -117,7 +133,11 @@ pub unsafe extern "C" fn bcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
 /// `s1` and `s2` must be valid pointers to memory of at least `n` bytes.
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
+pub unsafe extern "C" fn memcmp(
+  s1: *const c_void,
+  s2: *const c_void,
+  n: usize,
+) -> i32 {
   unsafe { bcmp(s1, s2, n) }
 }
 
@@ -128,7 +148,7 @@ pub unsafe extern "C" fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
 /// `s` must be a valid pointer to a null-terminated string.
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
-pub const unsafe extern "C" fn strlen(s: *const u8) -> usize {
+pub const unsafe extern "C" fn strlen(s: *const i8) -> usize {
   let mut len = 0;
   while unsafe { *s.add(len) } != 0 {
     len += 1;
@@ -618,4 +638,40 @@ pub unsafe fn sys_sched_getaffinity(
 #[inline]
 pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe { arch::sys_exit(code) }
+}
+
+// The freestanding memory symbols exist everywhere but macOS, where
+// libSystem supplies them instead.
+#[cfg(all(test, not(target_os = "macos")))]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn runtime_memory_symbols_match_c_semantics() {
+    let src = [1u8, 2, 3, 4];
+    let mut dest = [0u8; 4];
+
+    unsafe {
+      memcpy(dest.as_mut_ptr().cast(), src.as_ptr().cast(), src.len());
+    }
+    assert_eq!(dest, src);
+    assert_eq!(
+      unsafe { memcmp(dest.as_ptr().cast(), src.as_ptr().cast(), 4) },
+      0
+    );
+
+    unsafe {
+      memset(dest.as_mut_ptr().cast(), -1, dest.len());
+    }
+    assert_eq!(dest, [u8::MAX; 4]);
+    assert_ne!(
+      unsafe { bcmp(dest.as_ptr().cast(), src.as_ptr().cast(), 4) },
+      0
+    );
+  }
+
+  #[test]
+  fn runtime_strlen_uses_c_char_pointer() {
+    assert_eq!(unsafe { strlen(c"microfetch".as_ptr().cast()) }, 10);
+  }
 }
