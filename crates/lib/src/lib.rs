@@ -363,19 +363,22 @@ fn print_system_info(fields: &Fields) -> Result<(), Error> {
     core::fmt::write(
       &mut w,
       format_args!(
-        "\n    {b}⠀⠀⠀⠀⠀⠀⢼⣿⣄⠀⠀⠀{cy}⠹⣿⣷⡀⠀⣠⣿⡧⠀⠀⠀⠀⠀⠀{rs}  {user_info} ~{rs}\
-         \n    {b}⠀⠀⠀⠀⠀⠀⠈⢿⣿⣆⠀⠀⠀{cy}⠘⣿⣿⣴⣿⡿⠁⠀⠀⠀⠀⠀⠀{rs}  {cy}\u{F313}  {b}System{rs}       \u{E621} {os_name}\
-         \n    {b}⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡜{cy}⢿⣿⣟⠀⠀⠀{b}⢀⡄⠀⠀⠀{rs}  {cy}\u{E712}  {b}Kernel{rs}       \u{E621} {kernel_version}\
-         \n    {b}⠀⠀⠀⠉⠉⠉⠉{cy}⣩⣭⡭{b}⠉⠉⠉⠉⠉{cy}⠈⢿⣿⣆⠀{b}⢠⣿⣿⠂⠀⠀{rs}  {cy}\u{F2DB}  {b}CPU{rs}          \u{E621} {cpu_name}\
-         \n    {cy}⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀⠀⠀⢻⡟{b}⣡⣿⣿⠃⠀⠀⠀{rs}  {cy}\u{F4BC}  {b}Topology{rs}     \u{E621} {cpu_cores}\
-         \n    {cy}⢸⣿⣿⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{b}⣰⣿⣿⣿⣿⣿⣿⡇{rs}  {cy}\u{E795}  {b}Shell{rs}        \u{E621} {shell}\
-         \n    {cy}⠀⠀⠀⢠⣿⣿⢋{b}⣼⣧⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀{rs}  {cy}\u{F017}  {b}Uptime{rs}       \u{E621} {uptime}\
-         \n    {cy}⠀⠀⠠⣿⣿⠃⠀{b}⠹⣿⣷⡀{cy}⣀⣀⣀⣀⣀{b}⣚⣛⣋{cy}⣀⣀⣀⣀⠀⠀⠀{rs}  {cy}\u{F2D2}  {b}Desktop{rs}      \u{E621} {desktop}\
-         \n    {cy}⠀⠀⠀⠘⠁⠀⠀⠀{b}⣽⣿⣷⡜{cy}⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀{rs}  {cy}\u{F035B}  {b}Memory{rs}       \u{E621} {memory_usage}\
-         \n    {b}⠀⠀⠀⠀⠀⠀⢀⣾⣿⠟⣿⣿⡄⠀⠀⠀{cy}⠹⣿⣷⡀⠀⠀⠀⠀⠀⠀{rs}  {cy}\u{F194E}  {b}Storage (/){rs}  \u{E621} {storage}\
-         \n    {b}⠀⠀⠀⠀⠀⠀⢺⣿⠋⠀⠈⢿⣿⣆⠀⠀⠀{cy}⠙⣿⡗⠀⠀⠀⠀⠀⠀{rs}  {cy}\u{E22B}  {b}Colors{rs}       \u{E621} {colors}\n\n",
-        b = c.blue,
-        cy = c.cyan,
+        "\n    {l1}⠀⠀⠀⠀⠀⠀⢼⣿⣄⠀⠀⠀{l2}⠹⣿⣷⡀⠀⣠⣿⡧⠀⠀⠀⠀⠀⠀{rs}  {user_info} ~{rs}\
+         \n    {l1}⠀⠀⠀⠀⠀⠀⠈⢿⣿⣆⠀⠀⠀{l2}⠘⣿⣿⣴⣿⡿⠁⠀⠀⠀⠀⠀⠀{rs}  {icon}\u{F313}  {key}System{rs}       \u{E621} {val}{os_name}{rs}\
+         \n    {l1}⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡜{l2}⢿⣿⣟⠀⠀⠀{l1}⢀⡄⠀⠀⠀{rs}  {icon}\u{E712}  {key}Kernel{rs}       \u{E621} {val}{kernel_version}{rs}\
+         \n    {l1}⠀⠀⠀⠉⠉⠉⠉{l2}⣩⣭⡭{l1}⠉⠉⠉⠉⠉{l2}⠈⢿⣿⣆⠀{l1}⢠⣿⣿⠂⠀⠀{rs}  {icon}\u{F2DB}  {key}CPU{rs}          \u{E621} {val}{cpu_name}{rs}\
+         \n    {l2}⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀⠀⠀⢻⡟{l1}⣡⣿⣿⠃⠀⠀⠀{rs}  {icon}\u{F4BC}  {key}Topology{rs}     \u{E621} {val}{cpu_cores}{rs}\
+         \n    {l2}⢸⣿⣿⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{l1}⣰⣿⣿⣿⣿⣿⣿⡇{rs}  {icon}\u{E795}  {key}Shell{rs}        \u{E621} {val}{shell}{rs}\
+         \n    {l2}⠀⠀⠀⢠⣿⣿⢋{l1}⣼⣧⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀{rs}  {icon}\u{F017}  {key}Uptime{rs}       \u{E621} {val}{uptime}{rs}\
+         \n    {l2}⠀⠀⠠⣿⣿⠃⠀{l1}⠹⣿⣷⡀{l2}⣀⣀⣀⣀⣀{l1}⣚⣛⣋{l2}⣀⣀⣀⣀⠀⠀⠀{rs}  {icon}\u{F2D2}  {key}Desktop{rs}      \u{E621} {val}{desktop}{rs}\
+         \n    {l2}⠀⠀⠀⠘⠁⠀⠀⠀{l1}⣽⣿⣷⡜{l2}⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀{rs}  {icon}\u{F035B}  {key}Memory{rs}       \u{E621} {val}{memory_usage}{rs}\
+         \n    {l1}⠀⠀⠀⠀⠀⠀⢀⣾⣿⠟⣿⣿⡄⠀⠀⠀{l2}⠹⣿⣷⡀⠀⠀⠀⠀⠀⠀{rs}  {icon}\u{F194E}  {key}Storage (/){rs}  \u{E621} {val}{storage}{rs}\
+         \n    {l1}⠀⠀⠀⠀⠀⠀⢺⣿⠋⠀⠈⢿⣿⣆⠀⠀⠀{l2}⠙⣿⡗⠀⠀⠀⠀⠀⠀{rs}  {icon}\u{E22B}  {key}Colors{rs}       \u{E621} {val}{colors}{rs}\n\n",
+        l1 = c.l1,
+        l2 = c.l2,
+        icon = c.icon,
+        key = c.key,
+        val = c.value,
         rs = c.reset,
         user_info = user_info,
         os_name = os_name,

@@ -1,3 +1,5 @@
+include!(concat!(env!("OUT_DIR"), "/color_helpers.rs"));
+
 use alloc::string::String;
 use core::mem::MaybeUninit;
 
@@ -90,11 +92,11 @@ pub fn get_root_disk_usage() -> Result<String, Error> {
   result.push_str(" GiB / ");
   write_float(&mut result, total_size, 2);
   result.push_str(" GiB (");
-  result.push_str(colors.cyan);
+  result.push_str(colors.icon);
   write_float(&mut result, usage, 0);
   result.push('%');
   result.push_str(colors.reset);
-  result.push(')');
+  result.push_str(RPAREN);
 
   Ok(result)
 }
@@ -293,11 +295,11 @@ fn format_memory(used_memory: f64, total_memory: f64) -> String {
   result.push_str(" GiB / ");
   write_float(&mut result, total_memory, 2);
   result.push_str(" GiB (");
-  result.push_str(colors.cyan);
+  result.push_str(colors.icon);
   write_u64(&mut result, percentage_used);
   result.push('%');
   result.push_str(colors.reset);
-  result.push(')');
+  result.push_str(RPAREN);
 
   result
 }
