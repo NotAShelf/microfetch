@@ -74,7 +74,7 @@ jobs:
       run: rustup target add ${{ matrix.target }}
 
     - name: "Install the wild linker"
-      uses: wild-linker/action@0.9.0
+      uses: wild-linker/action@v0.10.0
     - name: "Put wild on PATH"
       run: echo "$RUNNER_TEMP/wild-install" >> "$GITHUB_PATH"
 
