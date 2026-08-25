@@ -54,6 +54,23 @@ pub use arch::{
   macos_uptime_secs,
 };
 
+#[cfg(not(target_os = "macos"))]
+const WORD: usize = size_of::<usize>();
+
+/// Whether an unaligned `usize` load is a single instruction here. SPARC and
+/// MIPS trap on one, and riscv64 hardware may emulate it in the trap handler,
+/// so those copy in words only when source and destination share alignment.
+#[cfg(not(target_os = "macos"))]
+const UNALIGNED_WORDS: bool = cfg!(any(
+  target_arch = "x86_64",
+  target_arch = "x86",
+  target_arch = "aarch64",
+  target_arch = "powerpc64",
+  target_arch = "powerpc",
+  target_arch = "s390x",
+  target_arch = "loongarch64",
+));
+
 /// Copies `n` bytes from `src` to `dest`.
 ///
 /// # Safety
@@ -64,6 +81,7 @@ pub use arch::{
 // clash at link time, so the freestanding implementations are Linux-only.
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
+#[allow(clippy::cast_ptr_alignment)]
 pub unsafe extern "C" fn memcpy(
   dest: *mut c_void,
   src: *const c_void,
@@ -71,9 +89,27 @@ pub unsafe extern "C" fn memcpy(
 ) -> *mut c_void {
   let dest_bytes = dest.cast::<u8>();
   let src_bytes = src.cast::<u8>();
-  for i in 0..n {
-    unsafe {
+  let mut i = 0;
+  unsafe {
+    if UNALIGNED_WORDS {
+      while n - i >= WORD {
+        let word = src_bytes.add(i).cast::<usize>().read_unaligned();
+        dest_bytes.add(i).cast::<usize>().write_unaligned(word);
+        i += WORD;
+      }
+    } else if dest_bytes as usize % WORD == src_bytes as usize % WORD {
+      while i < n && !(dest_bytes.add(i) as usize).is_multiple_of(WORD) {
+        *dest_bytes.add(i) = *src_bytes.add(i);
+        i += 1;
+      }
+      while n - i >= WORD {
+        *dest_bytes.add(i).cast::<usize>() = *src_bytes.add(i).cast::<usize>();
+        i += WORD;
+      }
+    }
+    while i < n {
       *dest_bytes.add(i) = *src_bytes.add(i);
+      i += 1;
     }
   }
   dest
@@ -87,6 +123,7 @@ pub unsafe extern "C" fn memcpy(
 /// The value in `c` is treated as unsigned (lower 8 bits used).
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
+#[allow(clippy::cast_ptr_alignment)]
 pub unsafe extern "C" fn memset(
   s: *mut c_void,
   c: i32,
@@ -94,9 +131,28 @@ pub unsafe extern "C" fn memset(
 ) -> *mut c_void {
   let bytes = s.cast::<u8>();
   let value = c.to_le_bytes()[0];
-  for i in 0..n {
-    unsafe {
+  let mut i = 0;
+  unsafe {
+    if UNALIGNED_WORDS {
+      let word = usize::from_ne_bytes([value; WORD]);
+      while n - i >= WORD {
+        bytes.add(i).cast::<usize>().write_unaligned(word);
+        i += WORD;
+      }
+    } else {
+      while i < n && !(bytes.add(i) as usize).is_multiple_of(WORD) {
+        *bytes.add(i) = value;
+        i += 1;
+      }
+      let word = usize::from_ne_bytes([value; WORD]);
+      while n - i >= WORD {
+        *bytes.add(i).cast::<usize>() = word;
+        i += WORD;
+      }
+    }
+    while i < n {
       *bytes.add(i) = value;
+      i += 1;
     }
   }
   s
