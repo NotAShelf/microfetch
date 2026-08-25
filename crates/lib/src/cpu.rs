@@ -319,17 +319,23 @@ fn write_model_name(w: &mut StackWriter) {
   };
   let data = &buf[..n];
 
-  let found = if let Some(name) = extract_name(data) {
-    w.push_str(name);
-    true
-  } else {
-    write_dt_compatible(w)
-  };
-  if !found {
+  let name = extract_name(data);
+  if name.is_none() && !write_dt_compatible(w) {
     return;
   }
 
-  if let Some(mhz) = get_cpu_freq_mhz() {
+  let mhz = get_cpu_freq_mhz();
+  if let Some(name) = name {
+    // x86 `model name` already ends in `@ <clock>GHz`, which hides the
+    // ` CPU` that trim() would otherwise strip, so re-trim after cutting.
+    let name = match (mhz, name.find(" @ ")) {
+      (Some(_), Some(at)) => trim(&name[..at]),
+      _ => name,
+    };
+    w.push_str(name);
+  }
+
+  if let Some(mhz) = mhz {
     w.push_str(" @ ");
     // Round to nearest 0.01 GHz, then split so carries (e.g. 1999 MHz)
     // roll into the integer part instead of overflowing the fraction.
