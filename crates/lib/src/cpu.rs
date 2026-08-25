@@ -210,36 +210,71 @@ fn format_cpufreq_path(buf: &mut [u8; 64], cpu: u32) -> usize {
   i + SUFFIX.len()
 }
 
+/// Read one CPU's `cpuinfo_max_freq`, in kHz.
+#[cfg(target_os = "linux")]
+fn read_cpu_max_khz(cpu: u32) -> Option<u32> {
+  let mut path = [0u8; 64];
+  let n = format_cpufreq_path(&mut path, cpu);
+  // SAFETY: the path is a constant prefix, decimal digits, and a constant
+  // suffix, so it is ASCII by construction.
+  let p = unsafe { core::str::from_utf8_unchecked(&path[..n]) };
+  let mut buf = [0u8; 32];
+  let m = read_file_fast(p, &mut buf).ok()?;
+  let mut khz = 0u32;
+  for &b in &buf[..m] {
+    if b.is_ascii_digit() {
+      khz = khz * 10 + u32::from(b - b'0');
+    }
+  }
+  (khz > 0).then_some(khz)
+}
+
+/// Highest CPU id the kernel lists in `/sys/devices/system/cpu/present`,
+/// which is an ascending cpulist.
+// https://github.com/torvalds/linux/blob/v6.19/drivers/base/cpu.c#L273-L286
+#[cfg(target_os = "linux")]
+fn highest_present_cpu() -> Option<u32> {
+  let mut buf = [0u8; 64];
+  let n = read_file_fast("/sys/devices/system/cpu/present", &mut buf).ok()?;
+  let data = &buf[..n];
+  let end = data.iter().rposition(u8::is_ascii_digit)? + 1;
+  let start = data[..end]
+    .iter()
+    .rposition(|b| !b.is_ascii_digit())
+    .map_or(0, |i| i + 1);
+  let mut cpu = 0u32;
+  for &b in &data[start..end] {
+    cpu = cpu * 10 + u32::from(b - b'0');
+  }
+  Some(cpu)
+}
+
 /// Read CPU frequency in MHz. Tries sysfs first, then cpuinfo data.
 #[cfg(target_os = "linux")]
 fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
-  // Read cpuinfo_max_freq across all CPUs (in kHz) and take the max so
-  // heterogeneous (big.LITTLE) topologies report the performance cluster.
-  let mut max_khz = 0u32;
-  let mut path = [0u8; 64];
-  for cpu in 0u32..64 {
-    let n = format_cpufreq_path(&mut path, cpu);
-    let p = match core::str::from_utf8(&path[..n]) {
-      Ok(s) => s,
-      Err(_) => continue,
-    };
-    let mut buf = [0u8; 32];
-    let Ok(m) = read_file_fast(p, &mut buf) else {
-      if cpu == 0 {
-        continue;
+  let last_cpu = highest_present_cpu().unwrap_or(63);
+  let first_khz = read_cpu_max_khz(0);
+  let last_khz = if last_cpu == 0 {
+    first_khz
+  } else {
+    read_cpu_max_khz(last_cpu)
+  };
+
+  let max_khz = match (first_khz, last_khz) {
+    (Some(first), Some(last)) if first == last => first,
+    (first, last) => {
+      let mut max_khz = first.unwrap_or(0).max(last.unwrap_or(0));
+      for cpu in 1..last_cpu {
+        let Some(khz) = read_cpu_max_khz(cpu) else {
+          break;
+        };
+        if khz > max_khz {
+          max_khz = khz;
+        }
       }
-      break;
-    };
-    let mut khz = 0u32;
-    for &b in &buf[..m] {
-      if b.is_ascii_digit() {
-        khz = khz * 10 + u32::from(b - b'0');
-      }
-    }
-    if khz > max_khz {
-      max_khz = khz;
-    }
-  }
+      max_khz
+    },
+  };
   if max_khz > 0 {
     return Some(max_khz / 1000);
   }
