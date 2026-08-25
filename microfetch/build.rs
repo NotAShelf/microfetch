@@ -21,7 +21,9 @@ fn main() {
   // Remove unreferenced input sections
   println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--gc-sections");
   // Strip all symbol table entries
-  println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--strip-all");
+  if std::env::var("DEBUG").as_deref() != Ok("true") {
+    println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--strip-all");
+  }
   // Omit the .note.gnu.build-id section
   println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--build-id=none");
   // Disable RELRO (removes relro_padding)
