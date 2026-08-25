@@ -345,7 +345,7 @@ fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
 /// Appends CPU frequency if available.
 #[cfg(target_os = "linux")]
 fn write_model_name(w: &mut StackWriter) {
-  let mut buf = [0u8; 2048];
+  let mut buf = [0u8; 1024];
   let Ok(n) = read_file_fast("/proc/cpuinfo", &mut buf) else {
     return;
   };
