@@ -14,7 +14,7 @@ name       = "microfetch"
 test       = false
 
 [dependencies]
-hotpath                    = { optional = true, version = "0.25.0" }
+hotpath                    = { optional = true, version = "0.26.1" }
 microfetch-asm.workspace   = true
 microfetch-lib.workspace   = true
 
