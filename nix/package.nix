@@ -14,7 +14,7 @@
   # On Linux the build drives the wild linker with LLVM/clang. macOS cannot
   # link statically and uses the default Apple clang stdenv with libSystem.
   stdenv' =
-    if stdenv.isDarwin
+    if stdenv.hostPlatform.isDarwin
     then rustPlatform.buildRustPackage
     else rustPlatform.buildRustPackage.override {inherit (llvm) stdenv;};
 
