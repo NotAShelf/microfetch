@@ -28,5 +28,5 @@ mkShell {
 
       gnuplot # for Criterion.rs plots
     ]
-    ++ lib.optionals stdenv.isLinux [wild];
+    ++ lib.optionals stdenv.hostPlatform.isLinux [wild];
 }
