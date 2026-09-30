@@ -3,8 +3,7 @@
   stdenv,
   rustPlatform,
   llvm,
-  clang,
-  wild,
+  buildPackages,
   # Check deps
   versionCheckHook,
 }: let
@@ -17,6 +16,8 @@
     if stdenv.hostPlatform.isDarwin
     then rustPlatform.buildRustPackage
     else rustPlatform.buildRustPackage.override {inherit (llvm) stdenv;};
+
+  inherit (buildPackages) clang wild;
 
   hasWild =
     stdenv.hostPlatform.isLinux
@@ -44,7 +45,7 @@ in
     nativeBuildInputs = lib.optionals hasWild [wild clang];
 
     env = lib.optionalAttrs hasWild {
-      RUSTFLAGS = "-Cforce-unwind-tables=no -Clinker=${clang}/bin/clang -Clink-arg=--ld-path=${wild}/bin/wild";
+      RUSTFLAGS = "-Cforce-unwind-tables=no -Clinker=${clang}/bin/${clang.targetPrefix}clang -Clink-arg=--ld-path=${wild}/bin/wild";
     };
 
     cargoLock.lockFile = "${finalAttrs.src}/Cargo.lock";
