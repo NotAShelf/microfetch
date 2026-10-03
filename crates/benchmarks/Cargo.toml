@@ -10,11 +10,21 @@ publish                = false
 [dependencies]
 criterion.workspace                 = true
 criterion-cycles-per-byte.workspace = true
+hotpath                             = { optional = true, version = "0.28.3" }
 microfetch-lib.workspace            = true
+
+[features]
+hotpath       = [ "dep:hotpath", "hotpath/hotpath", "microfetch-lib/hotpath" ]
+hotpath-alloc = [ "hotpath", "hotpath/hotpath-alloc", "microfetch-lib/hotpath-alloc" ]
+hotpath-cloud = [ "hotpath", "hotpath/hotpath-cloud" ]
 
 [[bench]]
 harness = false
 name    = "microfetch"
+
+[[example]]
+name              = "hotpath"
+required-features = [ "hotpath" ]
 
 [lints]
 workspace = true

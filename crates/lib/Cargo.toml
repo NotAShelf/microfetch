@@ -8,12 +8,12 @@ license.workspace      = true
 publish                = false
 
 [dependencies]
-hotpath                  = { optional = true, version = "0.25.0" }
+hotpath                  = { optional = true, version = "0.28.3" }
 microfetch-asm.workspace = true
 
 [features]
 hotpath       = [ "dep:hotpath", "hotpath/hotpath" ]
-hotpath-alloc = [ "hotpath/hotpath-alloc" ]
+hotpath-alloc = [ "hotpath", "hotpath/hotpath-alloc" ]
 
 [lints]
 workspace = true

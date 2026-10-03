@@ -1,0 +1,62 @@
+name: hotpath-benchmark
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      HOTPATH_BENCHMARK: microfetch
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rustflags: ""
+
+      - name: Install the wild linker
+        uses: wild-linker/action@v0.10.0
+      - name: Put wild on PATH
+        run: echo "$RUNNER_TEMP/wild-install" >> "$GITHUB_PATH"
+
+      - name: Benchmark and upload baseline
+        if: github.event_name == 'push'
+        env:
+          HOTPATH_UPLOAD: fail-on-error
+          HOTPATH_USER_METADATA: runner=${{ runner.os }}-${{ runner.arch }},profile=release
+          HOTPATH_OUTPUT_FORMAT: none
+        run: |
+          set -o pipefail
+          cargo run -q --release -p microfetch-bench --example hotpath \
+            --features hotpath,hotpath-alloc,hotpath-cloud 2>&1 | tee run.log
+          grep -q '^hotpath: uploaded report ' run.log
+
+      - name: Benchmark and write report
+        if: github.event_name == 'pull_request'
+        env:
+          HOTPATH_USER_METADATA: runner=${{ runner.os }}-${{ runner.arch }},profile=release
+          HOTPATH_OUTPUT_FORMAT: json
+          HOTPATH_OUTPUT_PATH: report.json
+        run: |
+          cargo run -q --release -p microfetch-bench --example hotpath \
+            --features hotpath,hotpath-alloc,hotpath-cloud
+
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'pull_request'
+        with:
+          name: hotpath-report
+          path: report.json
+          retention-days: 1
+          if-no-files-found: error

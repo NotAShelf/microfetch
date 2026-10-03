@@ -169,22 +169,22 @@ allocations. This helps identify performance bottlenecks and track optimization
 progress. It is so effective that thanks to Hotpath, Microfetch has seen a 60%
 reduction in the number of allocations.
 
-To profile timing:
+The `microfetch` binary is `no_std`, so profiling runs the same code from the
+`hotpath` example of the benchmarks crate. To profile timing:
 
 ```bash
-HOTPATH_JSON=true cargo run --features=hotpath
+cargo run --release -p microfetch-bench --example hotpath --features=hotpath
 ```
 
-To profile allocations:
+To profile timing and allocations:
 
 ```bash
-HOTPATH_JSON=true cargo run --features=hotpath,hotpath-alloc
+cargo run --release -p microfetch-bench --example hotpath --features=hotpath,hotpath-alloc
 ```
 
-The JSON output can be analyzed with the `hotpath` CLI tool for detailed
-performance metrics. On pull requests, GitHub Actions automatically profiles
-both timing and allocations, posting comparison comments to help catch
-performance regressions.
+On pull requests, GitHub Actions profiles timing and allocations and
+[hotpath.rs](https://hotpath.rs/ci_integration) compares them with `main`,
+posting a comment to help catch performance regressions.
 
 ## Installation
 

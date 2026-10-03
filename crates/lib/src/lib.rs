@@ -1,5 +1,8 @@
 #![no_std]
 
+// `hotpath::measure` expands to `std` paths.
+#[cfg(feature = "hotpath")] extern crate std;
+
 pub mod colors;
 pub mod cpu;
 pub mod desktop;
