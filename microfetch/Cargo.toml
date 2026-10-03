@@ -14,13 +14,8 @@ name       = "microfetch"
 test       = false
 
 [dependencies]
-hotpath                    = { optional = true, version = "0.25.0" }
 microfetch-asm.workspace   = true
 microfetch-lib.workspace   = true
-
-[features]
-hotpath       = [ "dep:hotpath" ]
-hotpath-alloc = [ "hotpath/hotpath-alloc" ]
 
 [lints]
 workspace = true
