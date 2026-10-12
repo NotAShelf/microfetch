@@ -135,11 +135,40 @@ fn get_core_count(threads: u32) -> u32 {
 
 /// Detect P-core and E-core counts via sysfs PMU device files, which is done
 /// by reading `/sys/devices/cpu_core/cpus` and `/sys/devices/cpu_atom/cpus`.
+///
+/// Both files list logical CPUs, so each count is divided by the SMT width
+/// of its core type. Parts with the E-cores fused off (e.g. i5-12400) still
+/// register `cpu_atom` with an empty cpulist, so the split is only reported
+/// when both core types are present.
 #[cfg(target_os = "linux")]
 fn get_pe_cores() -> Option<(u32, u32)> {
-  let p = count_cpulist("/sys/devices/cpu_core/cpus")?;
-  let e = count_cpulist("/sys/devices/cpu_atom/cpus").unwrap_or(0);
-  if p > 0 || e > 0 { Some((p, e)) } else { None }
+  let p = count_cores_in_cpulist("/sys/devices/cpu_core/cpus")?;
+  let e = count_cores_in_cpulist("/sys/devices/cpu_atom/cpus").unwrap_or(0);
+  if p > 0 && e > 0 { Some((p, e)) } else { None }
+}
+
+/// Count physical cores in a cpulist of logical CPUs by dividing by the SMT
+/// width of the first listed CPU.
+#[cfg(target_os = "linux")]
+fn count_cores_in_cpulist(path: &str) -> Option<u32> {
+  let mut buf = [0u8; 64];
+  let n = read_file_fast(path, &mut buf).ok()?;
+  let (threads, first) = parse_cpulist(&buf[..n]);
+  let Some(first) = first else {
+    return Some(0);
+  };
+  Some(threads / smt_width(first).max(1))
+}
+
+/// SMT width of one CPU from its `thread_siblings_list`, or 1 if unreadable.
+#[cfg(target_os = "linux")]
+fn smt_width(cpu: u32) -> u32 {
+  let mut path = [0u8; 64];
+  let n = format_cpu_path(&mut path, cpu, b"/topology/thread_siblings_list");
+  // SAFETY: the path is a constant prefix, decimal digits, and a constant
+  // suffix, so it is ASCII by construction.
+  let p = unsafe { core::str::from_utf8_unchecked(&path[..n]) };
+  count_cpulist(p).unwrap_or(1)
 }
 
 /// Parse a cpulist file and count listed CPUs.
@@ -147,13 +176,26 @@ fn get_pe_cores() -> Option<(u32, u32)> {
 fn count_cpulist(path: &str) -> Option<u32> {
   let mut buf = [0u8; 64];
   let n = read_file_fast(path, &mut buf).ok()?;
-  let data = &buf[..n];
+  Some(parse_cpulist(&buf[..n]).0)
+}
 
+/// Parse cpulist text such as `0-3,8,10-11`, returning the number of CPUs
+/// listed and the first CPU id. A blank list yields `(0, None)`.
+#[cfg(target_os = "linux")]
+fn parse_cpulist(data: &[u8]) -> (u32, Option<u32>) {
   let mut count = 0u32;
+  let mut first = None;
   let mut i = 0;
   while i < data.len() {
-    // Parse start number
+    // Skip separators and the trailing newline; a blank list is all newline.
+    if !data[i].is_ascii_digit() {
+      i += 1;
+      continue;
+    }
     let start = parse_num(data, &mut i);
+    if first.is_none() {
+      first = Some(start);
+    }
     if i < data.len() && data[i] == b'-' {
       i += 1;
       let end = parse_num(data, &mut i);
@@ -163,12 +205,8 @@ fn count_cpulist(path: &str) -> Option<u32> {
     } else {
       count += 1;
     }
-    // Skip comma or newline
-    if i < data.len() && (data[i] == b',' || data[i] == b'\n') {
-      i += 1;
-    }
   }
-  Some(count)
+  (count, first)
 }
 
 /// Parse a decimal number from a byte slice, advancing the index.
@@ -182,12 +220,11 @@ fn parse_num(data: &[u8], i: &mut usize) -> u32 {
   n
 }
 
-/// Build `/sys/devices/system/cpu/cpu{n}/cpufreq/cpuinfo_max_freq` into buf,
-/// returning the byte length written.
+/// Build `/sys/devices/system/cpu/cpu{n}{suffix}` into buf, returning the
+/// byte length written.
 #[cfg(target_os = "linux")]
-fn format_cpufreq_path(buf: &mut [u8; 64], cpu: u32) -> usize {
+fn format_cpu_path(buf: &mut [u8; 64], cpu: u32, suffix: &[u8]) -> usize {
   const PREFIX: &[u8] = b"/sys/devices/system/cpu/cpu";
-  const SUFFIX: &[u8] = b"/cpufreq/cpuinfo_max_freq";
   buf[..PREFIX.len()].copy_from_slice(PREFIX);
   let mut i = PREFIX.len();
   let mut tmp = [0u8; 3];
@@ -206,15 +243,15 @@ fn format_cpufreq_path(buf: &mut [u8; 64], cpu: u32) -> usize {
     buf[i] = tmp[digits];
     i += 1;
   }
-  buf[i..i + SUFFIX.len()].copy_from_slice(SUFFIX);
-  i + SUFFIX.len()
+  buf[i..i + suffix.len()].copy_from_slice(suffix);
+  i + suffix.len()
 }
 
 /// Read one CPU's `cpuinfo_max_freq`, in kHz.
 #[cfg(target_os = "linux")]
 fn read_cpu_max_khz(cpu: u32) -> Option<u32> {
   let mut path = [0u8; 64];
-  let n = format_cpufreq_path(&mut path, cpu);
+  let n = format_cpu_path(&mut path, cpu, b"/cpufreq/cpuinfo_max_freq");
   // SAFETY: the path is a constant prefix, decimal digits, and a constant
   // suffix, so it is ASCII by construction.
   let p = unsafe { core::str::from_utf8_unchecked(&path[..n]) };
@@ -519,4 +556,23 @@ fn trim(name: &str) -> &str {
   }
 
   &name[start..end]
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+  use super::parse_cpulist;
+
+  #[test]
+  fn parse_cpulist_counts_ranges_and_singles() {
+    assert_eq!(parse_cpulist(b"0-11\n"), (12, Some(0)));
+    assert_eq!(parse_cpulist(b"0-3,8,10-11\n"), (7, Some(0)));
+    assert_eq!(parse_cpulist(b"12-15\n"), (4, Some(12)));
+    assert_eq!(parse_cpulist(b"7"), (1, Some(7)));
+  }
+
+  #[test]
+  fn parse_cpulist_blank_is_empty() {
+    assert_eq!(parse_cpulist(b"\n"), (0, None));
+    assert_eq!(parse_cpulist(b""), (0, None));
+  }
 }
