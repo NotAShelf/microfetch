@@ -11,10 +11,10 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
       "bcs,a 1f",
       "sub %g0, %o0, %o0",
       "1:",
-      nr = in(reg) 5i32,  // SYS_open
+      nr = in(reg) 5_i32,  // SYS_open
       inlateout("o0") path => ret,
       in("o1") flags,
-      in("o2") 0i32,  // mode
+      in("o2") 0_i32,  // mode
       options(nostack)
     );
     ret
@@ -30,7 +30,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
       "bcs,a 1f",
       "sub %g0, %o0, %o0",
       "1:",
-      nr = in(reg) 3i32,  // SYS_read
+      nr = in(reg) 3_i32,  // SYS_read
       inlateout("o0") fd => ret,
       in("o1") buf,
       in("o2") count,
@@ -49,7 +49,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
       "bcs,a 1f",
       "sub %g0, %o0, %o0",
       "1:",
-      nr = in(reg) 4i32,  // SYS_write
+      nr = in(reg) 4_i32,  // SYS_write
       inlateout("o0") fd => ret,
       in("o1") buf,
       in("o2") count,
@@ -68,7 +68,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
       "bcs,a 1f",
       "sub %g0, %o0, %o0",
       "1:",
-      nr = in(reg) 6i32,  // SYS_close
+      nr = in(reg) 6_i32,  // SYS_close
       inlateout("o0") fd => ret,
       options(nostack)
     );
@@ -85,7 +85,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
       "bcs,a 1f",
       "sub %g0, %o0, %o0",
       "1:",
-      nr = in(reg) 189i32,  // SYS_newuname
+      nr = in(reg) 189_i32,  // SYS_newuname
       inlateout("o0") buf => ret,
       options(nostack)
     );
@@ -102,7 +102,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
       "bcs,a 1f",
       "sub %g0, %o0, %o0",
       "1:",
-      nr = in(reg) 234i32,  // SYS_statfs64
+      nr = in(reg) 234_i32,  // SYS_statfs64
       inlateout("o0") path => ret,
       in("o1") core::mem::size_of::<StatfsBuf>(),
       in("o2") buf,
@@ -142,7 +142,7 @@ pub unsafe fn sys_sched_getaffinity(
       "bcs,a 1f",
       "sub %g0, %o0, %o0",
       "1:",
-      nr = in(reg) 260i32,  // __NR_sched_getaffinity
+      nr = in(reg) 260_i32,  // __NR_sched_getaffinity
       inlateout("o0") pid => ret,
       in("o1") mask_size,
       in("o2") mask,
@@ -157,7 +157,7 @@ pub unsafe fn sys_exit(code: i32) -> ! {
     core::arch::asm!(
       "mov {nr}, %g1",
       "ta 0x10",
-      nr = in(reg) 1i32,  // SYS_exit
+      nr = in(reg) 1_i32,  // SYS_exit
       in("o0") code,
       options(noreturn, nostack)
     );

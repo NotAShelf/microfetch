@@ -7,10 +7,10 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "svc #0",
-      in("r7") 5i32,  // SYS_open
+      in("r7") 5_i32,  // SYS_open
       in("r0") path,
       in("r1") flags,
-      in("r2") 0i32,  // mode
+      in("r2") 0_i32,  // mode
       lateout("r0") ret,
       options(nostack)
     );
@@ -23,7 +23,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
     let ret: isize;
     core::arch::asm!(
       "svc #0",
-      in("r7") 3i32,  // SYS_read
+      in("r7") 3_i32,  // SYS_read
       in("r0") fd,
       in("r1") buf,
       in("r2") count,
@@ -39,7 +39,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
     let ret: isize;
     core::arch::asm!(
       "svc #0",
-      in("r7") 4i32,  // SYS_write
+      in("r7") 4_i32,  // SYS_write
       in("r0") fd,
       in("r1") buf,
       in("r2") count,
@@ -55,7 +55,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "svc #0",
-      in("r7") 6i32,  // SYS_close
+      in("r7") 6_i32,  // SYS_close
       in("r0") fd,
       lateout("r0") ret,
       options(nostack)
@@ -69,7 +69,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "svc #0",
-      in("r7") 122i32,  // SYS_newuname
+      in("r7") 122_i32,  // SYS_newuname
       in("r0") buf,
       lateout("r0") ret,
       options(nostack)
@@ -83,7 +83,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "svc #0",
-      in("r7") 266i32,  // SYS_statfs64
+      in("r7") 266_i32,  // SYS_statfs64
       in("r0") path,
       in("r1") core::mem::size_of::<StatfsBuf>(),
       in("r2") buf,
@@ -117,7 +117,7 @@ pub unsafe fn sys_sched_getaffinity(
     let ret: i32;
     core::arch::asm!(
       "svc #0",
-      in("r7") 242i32,  // __NR_sched_getaffinity
+      in("r7") 242_i32,  // __NR_sched_getaffinity
       in("r0") pid,
       in("r1") mask_size,
       in("r2") mask,
@@ -132,7 +132,7 @@ pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe {
     core::arch::asm!(
       "svc #0",
-      in("r7") 1i32,  // SYS_exit
+      in("r7") 1_i32,  // SYS_exit
       in("r0") code,
       options(noreturn, nostack)
     );

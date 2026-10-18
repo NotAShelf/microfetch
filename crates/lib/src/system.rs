@@ -1,13 +1,10 @@
 use core::mem::MaybeUninit;
 
 #[cfg(target_os = "linux")]
-use crate::syscall::read_file_fast;
-use crate::{
-  StackWriter,
-  UtsName,
-  colors::Colors,
-  syscall::{StatfsBuf, sys_statfs},
-};
+use microfetch_asm::read_file_fast;
+use microfetch_asm::{StatfsBuf, sys_statfs};
+
+use crate::{StackWriter, UtsName, colors::Colors};
 
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_username_and_hostname(
@@ -33,8 +30,7 @@ pub fn write_shell(writer: &mut StackWriter) {
   if shell.is_empty() {
     writer.push_str("unknown_shell");
   } else {
-    let start = shell.rfind('/').map_or(0, |pos| pos + 1);
-    writer.push_str(&shell[start..]);
+    writer.push_str(shell.rsplit_once('/').map_or(shell, |(_, name)| name));
   }
 }
 
@@ -42,14 +38,14 @@ pub fn write_shell(writer: &mut StackWriter) {
 /// be retrieved.
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_root_disk_usage(writer: &mut StackWriter, colors: &Colors) {
-  let mut vfs = MaybeUninit::<StatfsBuf>::uninit();
+  let mut vfs_buf = MaybeUninit::<StatfsBuf>::uninit();
   let path = b"/\0";
 
-  if unsafe { sys_statfs(path.as_ptr(), vfs.as_mut_ptr()) } != 0 {
+  if unsafe { sys_statfs(path.as_ptr(), vfs_buf.as_mut_ptr()) } != 0_i32 {
     return;
   }
 
-  let vfs = unsafe { vfs.assume_init() };
+  let vfs = unsafe { vfs_buf.assume_init() };
   #[allow(
     clippy::unnecessary_fallible_conversions,
     reason = "f_bsize is a signed long on most targets but u32 on macOS, \
@@ -79,7 +75,7 @@ pub fn write_root_disk_usage(writer: &mut StackWriter, colors: &Colors) {
 fn write_centi_gib(writer: &mut StackWriter, centi_gib: u64) {
   writer.push_u64(centi_gib / 100);
   writer.push_byte(b'.');
-  let frac = (centi_gib % 100) as u8;
+  let frac = u8::try_from(centi_gib % 100).unwrap_or(0);
   writer.push_byte(b'0' + frac / 10);
   writer.push_byte(b'0' + frac % 10);
 }
@@ -93,11 +89,11 @@ fn write_kb_as_gib(writer: &mut StackWriter, kb: u64) {
   write_centi_gib(writer, (kb * 100 + (1 << 19)) >> 20);
 }
 
-/// Fast integer parsing without stdlib overhead
+/// Fast integer parsing without stdlib overhead.
 #[cfg(target_os = "linux")]
 #[inline]
 fn parse_u64_fast(bytes: &[u8]) -> u64 {
-  let mut result = 0u64;
+  let mut result = 0_u64;
   for &byte in bytes {
     if byte.is_ascii_digit() {
       result = result * 10 + u64::from(byte - b'0');
@@ -113,7 +109,9 @@ fn parse_u64_fast(bytes: &[u8]) -> u64 {
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_memory_usage(writer: &mut StackWriter, colors: &Colors) {
-  let Some((used_bytes, total_bytes)) = crate::syscall::macos_meminfo() else {
+  use microfetch_asm::darwin::macos_meminfo;
+
+  let Some((used_bytes, total_bytes)) = macos_meminfo() else {
     return;
   };
   let percentage_used = (used_bytes * 100 + total_bytes / 2)
@@ -138,9 +136,9 @@ pub fn write_memory_usage(writer: &mut StackWriter, colors: &Colors) {
 pub fn write_memory_usage(writer: &mut StackWriter, colors: &Colors) {
   #[cfg_attr(feature = "hotpath", hotpath::measure)]
   fn parse_memory_info() -> Option<(u64, u64)> {
-    let mut total_memory_kb = 0u64;
-    let mut available_memory_kb = 0u64;
-    let mut buffer = [0u8; 1024];
+    let mut total_memory_kb = 0_u64;
+    let mut available_memory_kb = 0_u64;
+    let mut buffer = [0_u8; 1024];
 
     // Use fast syscall-based file reading
     let bytes_read = read_file_fast("/proc/meminfo", &mut buffer).ok()?;
@@ -161,21 +159,12 @@ pub fn write_memory_usage(writer: &mut StackWriter, colors: &Colors) {
         .unwrap_or(remaining.len());
       let line = &remaining[..line_end];
 
-      if line.starts_with(b"MemTotal:") {
-        // Skip "MemTotal:" and whitespace
-        let mut pos = 9;
-        while pos < line.len() && line[pos].is_ascii_whitespace() {
-          pos += 1;
-        }
-        total_memory_kb = parse_u64_fast(&line[pos..]);
+      if let Some(value) = line.strip_prefix(b"MemTotal:") {
+        total_memory_kb = parse_u64_fast(value.trim_ascii_start());
         found_total = true;
-      } else if line.starts_with(b"MemAvailable:") {
-        // Skip "MemAvailable:" and whitespace
-        let mut pos = 13;
-        while pos < line.len() && line[pos].is_ascii_whitespace() {
-          pos += 1;
-        }
-        available_memory_kb = parse_u64_fast(&line[pos..]);
+      }
+      if let Some(value) = line.strip_prefix(b"MemAvailable:") {
+        available_memory_kb = parse_u64_fast(value.trim_ascii_start());
         found_available = true;
       }
 

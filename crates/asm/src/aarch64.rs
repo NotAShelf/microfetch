@@ -7,11 +7,11 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "svc #0",
-      in("x8") 56i64,  // SYS_openat
-      in("x0") -100i32,  // AT_FDCWD
+      in("x8") 56_i64,  // SYS_openat
+      in("x0") -100_i32,  // AT_FDCWD
       in("x1") path,
       in("x2") flags,
-      in("x3") 0i32,  // mode
+      in("x3") 0_i32,  // mode
       lateout("x0") ret,
       options(nostack)
     );
@@ -24,7 +24,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
     let ret: isize;
     core::arch::asm!(
       "svc #0",
-      in("x8") 63i64,  // SYS_read
+      in("x8") 63_i64,  // SYS_read
       in("x0") fd,
       in("x1") buf,
       in("x2") count,
@@ -41,7 +41,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
     let ret: isize;
     core::arch::asm!(
       "svc #0",
-      in("x8") 64i64,  // SYS_write
+      in("x8") 64_i64,  // SYS_write
       in("x0") fd,
       in("x1") buf,
       in("x2") count,
@@ -58,7 +58,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "svc #0",
-      in("x8") 57i64,  // SYS_close
+      in("x8") 57_i64,  // SYS_close
       in("x0") fd,
       lateout("x0") ret,
       options(nostack)
@@ -72,7 +72,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "svc #0",
-      in("x8") 160i64,  // SYS_uname
+      in("x8") 160_i64,  // SYS_uname
       in("x0") buf,
       lateout("x0") ret,
       options(nostack)
@@ -86,7 +86,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "svc #0",
-      in("x8") 43i64,  // SYS_statfs
+      in("x8") 43_i64,  // SYS_statfs
       in("x0") path,
       in("x1") buf,
       lateout("x0") ret,
@@ -120,7 +120,7 @@ pub unsafe fn sys_sched_getaffinity(
     let ret: i32;
     core::arch::asm!(
       "svc #0",
-      in("x8") 123i64,  // __NR_sched_getaffinity
+      in("x8") 123_i64,  // __NR_sched_getaffinity
       in("x0") pid,
       in("x1") mask_size,
       in("x2") mask,
@@ -135,7 +135,7 @@ pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe {
     core::arch::asm!(
       "svc #0",
-      in("x8") 93i64,  // SYS_exit
+      in("x8") 93_i64,  // SYS_exit
       in("x0") code,
       options(noreturn, nostack)
     );

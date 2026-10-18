@@ -1,6 +1,6 @@
 use crate::StackWriter;
 
-/// Color codes for terminal output
+/// Color codes for terminal output.
 pub struct Colors {
   pub reset:   &'static str,
   pub blue:    &'static str,
@@ -12,7 +12,7 @@ pub struct Colors {
 }
 
 impl Colors {
-  #[must_use]
+  #[must_use = "this builds a palette without side effects"]
   pub const fn new(is_no_color: bool) -> Self {
     if is_no_color {
       Self {

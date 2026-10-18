@@ -7,10 +7,10 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "syscall",
-      in("rax") 2i64,  // SYS_open
+      in("rax") 2_i64,  // SYS_open
       in("rdi") path,
       in("rsi") flags,
-      in("rdx") 0i32,  // mode (not used for reading)
+      in("rdx") 0_i32,  // mode (not used for reading)
       lateout("rax") ret,
       lateout("rcx") _,
       lateout("r11") _,
@@ -25,7 +25,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
     let ret: isize;
     core::arch::asm!(
       "syscall",
-      in("rax") 0i64,  // SYS_read
+      in("rax") 0_i64,  // SYS_read
       in("rdi") fd,
       in("rsi") buf,
       in("rdx") count,
@@ -44,7 +44,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
     let ret: isize;
     core::arch::asm!(
       "syscall",
-      in("rax") 1i64,  // SYS_write
+      in("rax") 1_i64,  // SYS_write
       in("rdi") fd,
       in("rsi") buf,
       in("rdx") count,
@@ -63,7 +63,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "syscall",
-      in("rax") 3i64,  // SYS_close
+      in("rax") 3_i64,  // SYS_close
       in("rdi") fd,
       lateout("rax") ret,
       lateout("rcx") _,
@@ -79,7 +79,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "syscall",
-      in("rax") 63i64,  // SYS_uname
+      in("rax") 63_i64,  // SYS_uname
       in("rdi") buf,
       lateout("rax") ret,
       lateout("rcx") _,
@@ -96,7 +96,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "syscall",
-      in("rax") 137i64,  // SYS_statfs
+      in("rax") 137_i64,  // SYS_statfs
       in("rdi") path,
       in("rsi") buf,
       lateout("rax") ret,
@@ -134,7 +134,7 @@ pub unsafe fn sys_sched_getaffinity(
     let ret: i32;
     core::arch::asm!(
       "syscall",
-      in("rax") 204i64,  // __NR_sched_getaffinity
+      in("rax") 204_i64,  // __NR_sched_getaffinity
       in("rdi") pid,
       in("rsi") mask_size,
       in("rdx") mask,
@@ -151,7 +151,7 @@ pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe {
     core::arch::asm!(
       "syscall",
-      in("rax") 60i64,  // SYS_exit
+      in("rax") 60_i64,  // SYS_exit
       in("rdi") code,
       options(noreturn, nostack)
     );

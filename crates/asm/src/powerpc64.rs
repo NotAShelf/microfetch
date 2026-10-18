@@ -10,11 +10,11 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
       "bns+ 2f",
       "neg 3, 3",
       "2:",
-      inlateout("r0") 5i64 => _,  // SYS_open
+      inlateout("r0") 5_i64 => _,  // SYS_open
       in("r3") path,
       lateout("r3") ret,
       inlateout("r4") flags => _,
-      inlateout("r5") 0i32 => _,  // mode
+      inlateout("r5") 0_i32 => _,  // mode
       out("r6") _, out("r7") _, out("r8") _,
       out("r9") _, out("r10") _, out("r11") _, out("r12") _,
       out("cr0") _,
@@ -32,7 +32,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
       "bns+ 2f",
       "neg 3, 3",
       "2:",
-      inlateout("r0") 3i64 => _,  // SYS_read
+      inlateout("r0") 3_i64 => _,  // SYS_read
       in("r3") i64::from(fd),
       lateout("r3") ret,
       inlateout("r4") buf => _,
@@ -54,7 +54,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
       "bns+ 2f",
       "neg 3, 3",
       "2:",
-      inlateout("r0") 4i64 => _,  // SYS_write
+      inlateout("r0") 4_i64 => _,  // SYS_write
       in("r3") i64::from(fd),
       lateout("r3") ret,
       inlateout("r4") buf => _,
@@ -76,7 +76,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
       "bns+ 2f",
       "neg 3, 3",
       "2:",
-      inlateout("r0") 6i64 => _,  // SYS_close
+      inlateout("r0") 6_i64 => _,  // SYS_close
       in("r3") i64::from(fd),
       lateout("r3") ret,
       out("r4") _, out("r5") _, out("r6") _, out("r7") _, out("r8") _,
@@ -96,7 +96,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
       "bns+ 2f",
       "neg 3, 3",
       "2:",
-      inlateout("r0") 122i64 => _,  // SYS_uname
+      inlateout("r0") 122_i64 => _,  // SYS_uname
       in("r3") buf,
       lateout("r3") ret,
       out("r4") _, out("r5") _, out("r6") _, out("r7") _, out("r8") _,
@@ -116,7 +116,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
       "bns+ 2f",
       "neg 3, 3",
       "2:",
-      inlateout("r0") 99i64 => _,  // SYS_statfs
+      inlateout("r0") 99_i64 => _,  // SYS_statfs
       in("r3") path,
       lateout("r3") ret,
       inlateout("r4") buf => _,
@@ -161,7 +161,7 @@ pub unsafe fn sys_sched_getaffinity(
       "bns+ 2f",
       "neg 3, 3",
       "2:",
-      inlateout("r0") 223i64 => _,  // __NR_sched_getaffinity
+      inlateout("r0") 223_i64 => _,  // __NR_sched_getaffinity
       in("r3") i64::from(pid),
       lateout("r3") ret,
       inlateout("r4") mask_size => _,

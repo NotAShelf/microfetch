@@ -1,11 +1,8 @@
-use std::{env, process::Command};
+use std::{env, io, process::Command};
 
-fn main() {
+fn main() -> io::Result<()> {
   let rustc = env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-  let version = Command::new(rustc)
-    .arg("-vV")
-    .output()
-    .expect("failed to run `rustc -vV`");
+  let version = Command::new(rustc).arg("-vV").output()?;
   let nightly = String::from_utf8_lossy(&version.stdout)
     .lines()
     .any(|line| {
@@ -26,7 +23,7 @@ fn main() {
   // linker driver produces a correct (and ad-hoc code-signed) binary there.
   let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
   if target_os == "macos" {
-    return;
+    return Ok(());
   }
 
   // No C runtime, we provide _start ourselves
@@ -47,4 +44,6 @@ fn main() {
   println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--build-id=none");
   // Disable RELRO (removes relro_padding)
   println!("cargo:rustc-link-arg-bin=microfetch=-Wl,-z,norelro");
+
+  Ok(())
 }

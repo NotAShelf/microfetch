@@ -20,13 +20,14 @@
   feature(asm_experimental_arch)
 )]
 
-#[cfg(not(target_os = "macos"))] use core::ffi::c_void;
+#[cfg(not(target_os = "macos"))]
+use core::ffi::{c_char, c_void};
 
 // Per-arch syscall implementations live in their own module files.
 // macOS is matched first; there `target_arch` is `aarch64`, but the
 // implementation is libSystem-backed rather than raw `svc` traps.
 core::cfg_select! {
-  all(target_os = "macos", target_arch = "aarch64") => { #[path = "darwin.rs"  ] mod arch; }
+  all(target_os = "macos", target_arch = "aarch64") => { pub mod darwin; use darwin as arch; }
   target_os = "macos"         => { compile_error!("microfetch on macOS supports aarch64 (Apple Silicon) only"); }
   target_arch = "x86_64"      => { #[path = "x86_64.rs"     ] mod arch;        }
   target_arch = "aarch64"     => { #[path = "aarch64.rs"    ] mod arch;        }
@@ -44,15 +45,6 @@ core::cfg_select! {
   target_arch = "mips"        => { #[path = "mips.rs"       ] mod arch;        }
   _                           => { compile_error!("Unsupported architecture"); }
 }
-
-/// macOS-only helpers backed by `sysctl`/Mach (see `darwin.rs`).
-#[cfg(target_os = "macos")]
-pub use arch::{
-  macos_meminfo,
-  macos_sysctl_str,
-  macos_sysctl_u32,
-  macos_uptime_secs,
-};
 
 #[cfg(not(target_os = "macos"))]
 const WORD: usize = size_of::<usize>();
@@ -81,7 +73,10 @@ const UNALIGNED_WORDS: bool = cfg!(any(
 // clash at link time, so the freestanding implementations are Linux-only.
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
-#[allow(clippy::cast_ptr_alignment)]
+#[expect(
+  clippy::cast_ptr_alignment,
+  reason = "word accesses are either unaligned or follow an alignment prologue"
+)]
 pub unsafe extern "C" fn memcpy(
   dest: *mut c_void,
   src: *const c_void,
@@ -97,7 +92,8 @@ pub unsafe extern "C" fn memcpy(
         dest_bytes.add(offset).cast::<usize>().write_unaligned(word);
         offset += WORD;
       }
-    } else if dest_bytes.addr() % WORD == src_bytes.addr() % WORD {
+    }
+    if !UNALIGNED_WORDS && dest_bytes.addr() % WORD == src_bytes.addr() % WORD {
       while offset < len && !dest_bytes.add(offset).addr().is_multiple_of(WORD)
       {
         *dest_bytes.add(offset) = *src_bytes.add(offset);
@@ -125,18 +121,21 @@ pub unsafe extern "C" fn memcpy(
 /// The value in `fill` is treated as unsigned (lower 8 bits used).
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
-#[allow(clippy::cast_ptr_alignment)]
+#[expect(
+  clippy::cast_ptr_alignment,
+  reason = "word accesses are either unaligned or follow an alignment prologue"
+)]
 pub unsafe extern "C" fn memset(
   dest: *mut c_void,
   fill: i32,
   len: usize,
 ) -> *mut c_void {
   let bytes = dest.cast::<u8>();
-  let value = fill.to_le_bytes()[0];
+  let value = u8::try_from(fill & 0xFF_i32).unwrap_or(0);
   let mut offset = 0;
   unsafe {
     if UNALIGNED_WORDS {
-      let word = usize::from_ne_bytes([value; WORD]);
+      let word = usize::MAX / 0xFF * usize::from(value);
       while len - offset >= WORD {
         bytes.add(offset).cast::<usize>().write_unaligned(word);
         offset += WORD;
@@ -146,7 +145,7 @@ pub unsafe extern "C" fn memset(
         *bytes.add(offset) = value;
         offset += 1;
       }
-      let word = usize::from_ne_bytes([value; WORD]);
+      let word = usize::MAX / 0xFF * usize::from(value);
       while len - offset >= WORD {
         *bytes.add(offset).cast::<usize>() = word;
         offset += WORD;
@@ -206,7 +205,7 @@ pub unsafe extern "C" fn memcmp(
 /// `cstr` must be a valid pointer to a null-terminated string.
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
-pub const unsafe extern "C" fn strlen(cstr: *const i8) -> usize {
+pub const unsafe extern "C" fn strlen(cstr: *const c_char) -> usize {
   let mut len = 0;
   while unsafe { *cstr.add(len) } != 0 {
     len += 1;
@@ -255,7 +254,7 @@ pub unsafe extern "C" fn entry_rust(stack: *const usize) -> i32 {
   let argc = unsafe { *stack };
   let argv = unsafe { stack.add(1).cast::<*const u8>() };
 
-  // SAFETY: argc is unlikely to exceed i32::MAX on real systems
+  // argc is unlikely to exceed i32::MAX on real systems
   let argc_i32 = i32::try_from(argc).unwrap_or(i32::MAX);
 
   // Call the main function (defined by the binary crate)
@@ -270,11 +269,11 @@ unsafe extern "C" {
   fn main(argc: i32, argv: *const *const u8) -> i32;
 }
 
-/// Direct syscall to open a file
+/// Direct syscall to open a file.
 ///
 /// # Returns
 ///
-/// File descriptor or -1 on error
+/// File descriptor or -1 on error.
 ///
 /// # Safety
 ///
@@ -283,16 +282,16 @@ unsafe extern "C" {
 /// - `path` points to a valid null-terminated C string
 /// - The pointer remains valid for the duration of the syscall
 #[inline]
-#[must_use]
+#[must_use = "the descriptor must be checked and closed"]
 pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe { arch::sys_open(path, flags) }
 }
 
-/// Direct syscall to read from a file descriptor
+/// Direct syscall to read from a file descriptor.
 ///
 /// # Returns
 ///
-/// Number of bytes read or -1 on error
+/// Number of bytes read or -1 on error.
 ///
 /// # Safety
 ///
@@ -305,11 +304,11 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
   unsafe { arch::sys_read(fd, buf, count) }
 }
 
-/// Direct syscall to write to a file descriptor
+/// Direct syscall to write to a file descriptor.
 ///
 /// # Returns
 ///
-/// Number of bytes written or -1 on error
+/// Number of bytes written or -1 on error.
 ///
 /// # Safety
 ///
@@ -318,18 +317,18 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
 /// - `buf` points to a valid readable buffer of at least `count` bytes
 /// - `fd` is a valid open file descriptor
 #[inline]
-#[must_use]
+#[must_use = "a short or failed write goes unnoticed otherwise"]
 pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
   unsafe { arch::sys_write(fd, buf, count) }
 }
 
-/// Direct syscall to close a file descriptor
+/// Direct syscall to close a file descriptor.
 ///
 /// # Safety
 ///
-/// The caller must ensure that `fd` is a valid open file descriptor
+/// The caller must ensure that `fd` is a valid open file descriptor.
 #[inline]
-#[must_use]
+#[must_use = "close can report a deferred I/O error"]
 pub unsafe fn sys_close(fd: i32) -> i32 {
   unsafe { arch::sys_close(fd) }
 }
@@ -340,7 +339,6 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
 /// machine. The `domainname` field (GNU extension, `[i8; 65]`) follows but is
 /// not used, nor any useful to us here.
 #[repr(C)]
-#[allow(dead_code)]
 #[cfg(not(target_os = "macos"))]
 pub struct UtsNameBuf {
   pub sysname:    [i8; 65],
@@ -364,17 +362,16 @@ pub struct UtsNameBuf {
   pub machine:  [i8; 256],
 }
 
-/// Direct `uname(2)` syscall
+/// Direct `uname(2)` syscall.
 ///
 /// # Returns
 ///
-/// 0 on success, negative on error
+/// 0 on success, negative on error.
 ///
 /// # Safety
 ///
 /// The caller must ensure that `buf` points to a valid `UtsNameBuf`.
 #[inline]
-#[allow(dead_code)]
 pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
   unsafe { arch::sys_uname(buf) }
 }
@@ -459,7 +456,7 @@ pub struct StatfsBuf {
 }
 
 /// on armv7 `statfs64(2)` has 32-bit word fields; see
-/// https://github.com/torvalds/linux/blob/v6.19/include/uapi/asm-generic/statfs.h
+/// <https://github.com/torvalds/linux/blob/v6.19/include/uapi/asm-generic/statfs.h>.
 #[repr(C)]
 #[cfg(any(
   target_arch = "arm",
@@ -486,14 +483,14 @@ pub struct StatfsBuf {
 }
 
 /// mips (O32) uses `compat_statfs64`, same reordering with 32-bit words; see
-/// https://github.com/torvalds/linux/blob/v6.19/arch/mips/include/uapi/asm/statfs.h
+/// <https://github.com/torvalds/linux/blob/v6.19/arch/mips/include/uapi/asm/statfs.h>.
 #[repr(C)]
 #[cfg(target_arch = "mips")]
 pub struct StatfsBuf {
   pub f_type:    u32,
   pub f_bsize:   u32,
   pub f_frsize:  u32,
-  _pad:          u32,
+  pub pad:       u32,
   pub f_blocks:  u64,
   pub f_bfree:   u64,
   pub f_files:   u64,
@@ -508,7 +505,7 @@ pub struct StatfsBuf {
 }
 
 /// mips reorders fields; see
-/// https://github.com/torvalds/linux/blob/v6.19/arch/mips/include/uapi/asm/statfs.h
+/// <https://github.com/torvalds/linux/blob/v6.19/arch/mips/include/uapi/asm/statfs.h>.
 #[repr(C)]
 #[cfg(target_arch = "mips64")]
 pub struct StatfsBuf {
@@ -528,11 +525,11 @@ pub struct StatfsBuf {
   pub _pad: [i64; 5],
 }
 
-/// Direct `statfs(2)` syscall
+/// Direct `statfs(2)` syscall.
 ///
 /// # Returns
 ///
-/// 0 on success, negative errno on error
+/// 0 on success, negative errno on error.
 ///
 /// # Safety
 ///
@@ -563,7 +560,7 @@ pub fn read_file_fast(path: &str, buffer: &mut [u8]) -> Result<usize, i32> {
     return Err(-22); // EINVAL
   }
 
-  let mut path_buf = [0u8; 256];
+  let mut path_buf = [0_u8; 256];
   path_buf[..path_bytes.len()].copy_from_slice(path_bytes);
   // XXX: Already zero-terminated since array is initialized to zeros
 
@@ -574,10 +571,12 @@ pub fn read_file_fast(path: &str, buffer: &mut [u8]) -> Result<usize, i32> {
     }
 
     let bytes_read = sys_read(fd, buffer.as_mut_ptr(), buffer.len());
-    let _ = sys_close(fd);
+    _ = sys_close(fd);
 
-    usize::try_from(bytes_read)
-      .map_err(|_| i32::try_from(bytes_read).unwrap_or(i32::MIN))
+    let Ok(len) = usize::try_from(bytes_read) else {
+      return Err(i32::try_from(bytes_read).unwrap_or(i32::MIN));
+    };
+    Ok(len)
   }
 }
 
@@ -608,8 +607,8 @@ pub struct SysInfo {
   pub totalswap: u64,
   pub freeswap:  u64,
   pub procs:     u16,
-  _pad:          u16,
-  _pad2:         u32, /* alignment padding to reach 8-byte boundary for
+  pub pad:       u16,
+  pub pad2:      u32, /* alignment padding to reach 8-byte boundary for
                        * totalhigh */
   pub totalhigh: u64,
   pub freehigh:  u64,
@@ -619,7 +618,7 @@ pub struct SysInfo {
 }
 
 /// on armv7 `__kernel_long_t` is 4 bytes; see
-/// https://github.com/torvalds/linux/blob/v6.19/include/uapi/linux/sysinfo.h
+/// <https://github.com/torvalds/linux/blob/v6.19/include/uapi/linux/sysinfo.h>.
 #[repr(C)]
 #[cfg(any(
   target_arch = "arm",
@@ -639,7 +638,7 @@ pub struct SysInfo {
   pub totalswap: u32,
   pub freeswap:  u32,
   pub procs:     u16,
-  _pad:          u16,
+  pub pad:       u16,
   pub totalhigh: u32,
   pub freehigh:  u32,
   pub mem_unit:  u32,
@@ -647,11 +646,11 @@ pub struct SysInfo {
   pub _f:        [u8; 8],
 }
 
-/// Direct `sysinfo(2)` syscall
+/// Direct `sysinfo(2)` syscall.
 ///
 /// # Returns
 ///
-/// 0 on success, negative errno on error
+/// 0 on success, negative errno on error.
 ///
 /// # Safety
 ///
@@ -661,7 +660,7 @@ pub unsafe fn sys_sysinfo(info: *mut SysInfo) -> i64 {
   unsafe { arch::sys_sysinfo(info) }
 }
 
-/// Direct `sched_getaffinity(2)` syscall
+/// Direct `sched_getaffinity(2)` syscall.
 ///
 /// # Returns
 ///
@@ -681,7 +680,7 @@ pub unsafe fn sys_sched_getaffinity(
   unsafe { arch::sys_sched_getaffinity(pid, mask_size, mask) }
 }
 
-/// Direct syscall to exit the process
+/// Direct syscall to exit the process.
 ///
 /// # Safety
 ///
@@ -699,25 +698,21 @@ mod tests {
 
   #[test]
   fn runtime_memory_symbols_match_c_semantics() {
-    let src = [1u8, 2, 3, 4];
-    let mut dest = [0u8; 4];
+    let src = [1_u8, 2, 3, 4];
+    let mut dest = [0_u8; 4];
 
-    unsafe {
-      memcpy(dest.as_mut_ptr().cast(), src.as_ptr().cast(), src.len());
-    }
+    unsafe { memcpy(dest.as_mut_ptr().cast(), src.as_ptr().cast(), src.len()) };
     assert_eq!(dest, src);
     assert_eq!(
       unsafe { memcmp(dest.as_ptr().cast(), src.as_ptr().cast(), 4) },
-      0
+      0_i32
     );
 
-    unsafe {
-      memset(dest.as_mut_ptr().cast(), -1, dest.len());
-    }
+    unsafe { memset(dest.as_mut_ptr().cast(), -1, dest.len()) };
     assert_eq!(dest, [u8::MAX; 4]);
     assert_ne!(
       unsafe { bcmp(dest.as_ptr().cast(), src.as_ptr().cast(), 4) },
-      0
+      0_i32
     );
   }
 
