@@ -11,10 +11,10 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
       "nop",
       "subu $2, $0, $2",
       "1:",
-      inlateout("$2") 4000i32 + 5 => ret,  // SYS_open
+      inlateout("$2") 4000_i32 + 5 => ret,  // SYS_open
       in("$4") path,
       in("$5") flags,
-      in("$6") 0i32,  // mode
+      in("$6") 0_i32,  // mode
       lateout("$7") _,
       lateout("$8") _, lateout("$9") _, lateout("$10") _, lateout("$11") _,
       lateout("$12") _, lateout("$13") _, lateout("$14") _, lateout("$15") _,
@@ -34,7 +34,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
       "nop",
       "subu $2, $0, $2",
       "1:",
-      inlateout("$2") 4000i32 + 3 => ret,  // SYS_read
+      inlateout("$2") 4000_i32 + 3 => ret,  // SYS_read
       in("$4") fd,
       in("$5") buf,
       in("$6") count,
@@ -57,7 +57,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
       "nop",
       "subu $2, $0, $2",
       "1:",
-      inlateout("$2") 4000i32 + 4 => ret,  // SYS_write
+      inlateout("$2") 4000_i32 + 4 => ret,  // SYS_write
       in("$4") fd,
       in("$5") buf,
       in("$6") count,
@@ -80,7 +80,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
       "nop",
       "subu $2, $0, $2",
       "1:",
-      inlateout("$2") 4000i32 + 6 => ret,  // SYS_close
+      inlateout("$2") 4000_i32 + 6 => ret,  // SYS_close
       in("$4") fd,
       lateout("$7") _,
       lateout("$8") _, lateout("$9") _, lateout("$10") _, lateout("$11") _,
@@ -101,7 +101,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
       "nop",
       "subu $2, $0, $2",
       "1:",
-      inlateout("$2") 4000i32 + 122 => ret,  // SYS_newuname
+      inlateout("$2") 4000_i32 + 122 => ret,  // SYS_newuname
       in("$4") buf,
       lateout("$7") _,
       lateout("$8") _, lateout("$9") _, lateout("$10") _, lateout("$11") _,
@@ -122,7 +122,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
       "nop",
       "subu $2, $0, $2",
       "1:",
-      inlateout("$2") 4000i32 + 255 => ret,  // SYS_statfs64
+      inlateout("$2") 4000_i32 + 255 => ret,  // SYS_statfs64
       in("$4") path,
       in("$5") core::mem::size_of::<StatfsBuf>(),
       in("$6") buf,
@@ -170,7 +170,7 @@ pub unsafe fn sys_sched_getaffinity(
       "nop",
       "subu $2, $0, $2",
       "1:",
-      inlateout("$2") 4000i32 + 240 => ret,  // __NR_sched_getaffinity
+      inlateout("$2") 4000_i32 + 240 => ret,  // __NR_sched_getaffinity
       in("$4") pid,
       in("$5") mask_size,
       in("$6") mask,
@@ -188,7 +188,7 @@ pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe {
     core::arch::asm!(
       "syscall",
-      in("$2") 4000i32 + 1,  // SYS_exit
+      in("$2") 4000_i32 + 1,  // SYS_exit
       in("$4") code,
       options(noreturn, nostack)
     );

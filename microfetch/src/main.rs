@@ -25,10 +25,6 @@ use core::arch::naked_asm;
 #[cfg(not(any(target_os = "macos", target_abi = "elfv1")))]
 use microfetch_asm::entry_rust;
 use microfetch_asm::sys_write;
-// Re-export libc replacement functions from asm crate. On macOS these are
-// provided by libSystem, so we don't define (or re-export) our own.
-#[cfg(not(target_os = "macos"))]
-pub use microfetch_asm::{memcpy, memset, strlen};
 
 #[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
@@ -324,14 +320,14 @@ pub unsafe extern "C" fn main(argc: i32, argv: *const *const u8) -> i32 {
   // Initialize the environment pointer
   unsafe {
     microfetch_lib::init_env(envp);
-  }
+  };
 
   // Run the main application logic
   if unsafe { microfetch_lib::run(argc, argv) }.is_ok() {
     0
   } else {
     const ERR_MSG: &[u8] = b"Error\n";
-    let _ = unsafe { sys_write(2, ERR_MSG.as_ptr(), ERR_MSG.len()) };
+    _ = unsafe { sys_write(2, ERR_MSG.as_ptr(), ERR_MSG.len()) };
     1
   }
 }
@@ -341,15 +337,15 @@ pub unsafe extern "C" fn main(argc: i32, argv: *const *const u8) -> i32 {
 fn panic(_info: &core::panic::PanicInfo) -> ! {
   const PANIC_MSG: &[u8] = b"panic\n";
   unsafe {
-    let _ = sys_write(2, PANIC_MSG.as_ptr(), PANIC_MSG.len());
+    _ = sys_write(2, PANIC_MSG.as_ptr(), PANIC_MSG.len());
     microfetch_asm::sys_exit(1)
   }
 }
 
-/// Stubs for Rust exception handling
+/// Stubs for Rust exception handling.
 ///
 /// Nightly mangles this symbol with a per-compiler hash since
-/// https://github.com/rust-lang/rust/pull/148413, so only the lang item can name
+/// <https://github.com/rust-lang/rust/pull/148413>, so only the lang item can name
 /// it there.
 #[cfg(all(not(test), nightly))]
 #[lang = "eh_personality"]

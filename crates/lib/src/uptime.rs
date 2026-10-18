@@ -1,11 +1,14 @@
 #[cfg(target_os = "linux")] use core::mem::MaybeUninit;
 
+#[cfg(target_os = "macos")]
+use microfetch_asm::darwin::macos_uptime_secs;
+#[cfg(target_os = "linux")] use microfetch_asm::sys_sysinfo;
+
 use crate::StackWriter;
-#[cfg(target_os = "linux")] use crate::syscall::sys_sysinfo;
 
 /// Writes the current system uptime, or nothing if it cannot be retrieved.
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_uptime(writer: &mut StackWriter) {
+pub fn write(writer: &mut StackWriter) {
   #[cfg(target_os = "linux")]
   let uptime_seconds = {
     let mut info = MaybeUninit::uninit();
@@ -19,7 +22,7 @@ pub fn write_uptime(writer: &mut StackWriter) {
     seconds
   };
   #[cfg(target_os = "macos")]
-  let Some(uptime_seconds) = crate::syscall::macos_uptime_secs() else {
+  let Some(uptime_seconds) = macos_uptime_secs() else {
     return;
   };
 

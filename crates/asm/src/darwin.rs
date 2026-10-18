@@ -59,27 +59,27 @@ unsafe extern "C" {
   ) -> c_int;
 }
 
-pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
+pub(crate) unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe { open(path.cast::<c_char>(), flags) }
 }
 
-pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
+pub(crate) unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
   unsafe { read(fd, buf.cast::<c_void>(), count) }
 }
 
-pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
+pub(crate) unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
   unsafe { write(fd, buf.cast::<c_void>(), count) }
 }
 
-pub unsafe fn sys_close(fd: i32) -> i32 {
+pub(crate) unsafe fn sys_close(fd: i32) -> i32 {
   unsafe { close(fd) }
 }
 
-pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
+pub(crate) unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
   unsafe { uname(buf) }
 }
 
-pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
+pub(crate) unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
   unsafe { statfs(path.cast::<c_char>(), buf) }
 }
 
@@ -89,7 +89,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
   clippy::missing_const_for_fn,
   reason = "keeps the signature of the syscall it stands in for"
 )]
-pub unsafe fn sys_sysinfo(_info: *mut SysInfo) -> i64 {
+pub(crate) unsafe fn sys_sysinfo(_info: *mut SysInfo) -> i64 {
   -1
 }
 
@@ -100,7 +100,7 @@ pub unsafe fn sys_sysinfo(_info: *mut SysInfo) -> i64 {
   clippy::missing_const_for_fn,
   reason = "keeps the signature of the syscall it stands in for"
 )]
-pub unsafe fn sys_sched_getaffinity(
+pub(crate) unsafe fn sys_sched_getaffinity(
   _pid: i32,
   _mask_size: usize,
   _mask: *mut u8,
@@ -108,7 +108,7 @@ pub unsafe fn sys_sched_getaffinity(
   -1
 }
 
-pub unsafe fn sys_exit(code: i32) -> ! {
+pub(crate) unsafe fn sys_exit(code: i32) -> ! {
   unsafe { _exit(code) }
 }
 
@@ -116,7 +116,7 @@ pub unsafe fn sys_exit(code: i32) -> ! {
 /// NUL-terminated byte string (e.g. `b"machdep.cpu.brand_string\0"`).
 ///
 /// Returns the number of bytes written, excluding the trailing NUL.
-#[must_use]
+#[must_use = "the length says how much of `out` was filled"]
 pub fn macos_sysctl_str(name: &[u8], out: &mut [u8]) -> Option<usize> {
   let mut len = out.len();
   let ret = unsafe {
@@ -128,7 +128,7 @@ pub fn macos_sysctl_str(name: &[u8], out: &mut [u8]) -> Option<usize> {
       0,
     )
   };
-  if ret != 0 {
+  if ret != 0_i32 {
     return None;
   }
   // `len` includes the terminating NUL on success.
@@ -136,7 +136,7 @@ pub fn macos_sysctl_str(name: &[u8], out: &mut [u8]) -> Option<usize> {
 }
 
 /// Read a 32-bit integer sysctl by name (e.g. `b"hw.logicalcpu\0"`).
-#[must_use]
+#[must_use = "this only queries the kernel"]
 pub fn macos_sysctl_u32(name: &[u8]) -> Option<u32> {
   let mut val: u32 = 0;
   let mut len = size_of::<u32>();
@@ -149,11 +149,7 @@ pub fn macos_sysctl_u32(name: &[u8]) -> Option<u32> {
       0,
     )
   };
-  if ret == 0 && len == size_of::<u32>() {
-    Some(val)
-  } else {
-    None
-  }
+  (ret == 0_i32 && len == size_of::<u32>()).then_some(val)
 }
 
 /// Read a 64-bit integer sysctl by name (e.g. `b"hw.memsize\0"`).
@@ -169,11 +165,7 @@ fn macos_sysctl_u64(name: &[u8]) -> Option<u64> {
       0,
     )
   };
-  if ret == 0 && len == size_of::<u64>() {
-    Some(val)
-  } else {
-    None
-  }
+  (ret == 0_i32 && len == size_of::<u64>()).then_some(val)
 }
 
 const HOST_VM_INFO64: c_int = 4;
@@ -217,11 +209,11 @@ struct VmStatistics64 {
 /// Used" as `(active + wired + compressed) * page_size`; inactive and free
 /// pages are treated as available. This is an approximation and the exact
 /// formula can be tuned against real hardware.
-#[must_use]
+#[must_use = "this only queries the kernel"]
 pub fn macos_meminfo() -> Option<(u64, u64)> {
   let total = macos_sysctl_u64(b"hw.memsize\0")?;
   // Apple Silicon uses 16 KiB pages; fall back to that if the sysctl is absent.
-  let page = u64::from(macos_sysctl_u32(b"hw.pagesize\0").unwrap_or(16384));
+  let page = u64::from(macos_sysctl_u32(b"hw.pagesize\0").unwrap_or(0x4000));
 
   let mut vm_stats = VmStatistics64::default();
   let mut count =
@@ -234,7 +226,7 @@ pub fn macos_meminfo() -> Option<(u64, u64)> {
       &raw mut count,
     )
   };
-  if ret != 0 {
+  if ret != 0_i32 {
     // Mach call failed; report total with unknown usage rather than erroring.
     return Some((0, total));
   }
@@ -260,7 +252,7 @@ const CTL_KERN: c_int = 1;
 const KERN_BOOTTIME: c_int = 21;
 
 /// Returns the system uptime in seconds (`now - kern.boottime`).
-#[must_use]
+#[must_use = "this only queries the kernel"]
 pub fn macos_uptime_secs() -> Option<u64> {
   let mib = [CTL_KERN, KERN_BOOTTIME];
   let mut boot = Timeval::default();
@@ -275,12 +267,12 @@ pub fn macos_uptime_secs() -> Option<u64> {
       0,
     )
   };
-  if ret != 0 {
+  if ret != 0_i32 {
     return None;
   }
 
   let mut now = Timeval::default();
-  if unsafe { gettimeofday(&raw mut now, ptr::null_mut()) } != 0 {
+  if unsafe { gettimeofday(&raw mut now, ptr::null_mut()) } != 0_i32 {
     return None;
   }
 

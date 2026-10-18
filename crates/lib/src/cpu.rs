@@ -1,6 +1,7 @@
-use crate::StackWriter;
 #[cfg(target_os = "linux")]
-use crate::syscall::read_file_fast;
+use microfetch_asm::read_file_fast;
+
+use crate::StackWriter;
 
 /// Writes CPU model name (trimmed) to the writer.
 #[cfg(target_os = "linux")]
@@ -14,9 +15,10 @@ pub fn write_cpu_name(writer: &mut StackWriter) {
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_cpu_name(writer: &mut StackWriter) {
-  let mut buf = [0u8; 128];
-  if let Some(len) =
-    crate::syscall::macos_sysctl_str(b"machdep.cpu.brand_string\0", &mut buf)
+  use microfetch_asm::darwin::macos_sysctl_str;
+
+  let mut buf = [0_u8; 128];
+  if let Some(len) = macos_sysctl_str(b"machdep.cpu.brand_string\0", &mut buf)
     && let Ok(name) = core::str::from_utf8(&buf[..len])
   {
     writer.push_str(name);
@@ -46,7 +48,7 @@ pub fn write_cpu_cores(writer: &mut StackWriter) {
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_cpu_cores(writer: &mut StackWriter) {
-  use crate::syscall::macos_sysctl_u32;
+  use microfetch_asm::darwin::macos_sysctl_u32;
 
   let Some(threads) = macos_sysctl_u32(b"hw.logicalcpu\0") else {
     return;
@@ -96,12 +98,12 @@ fn write_cores(
 /// Count online threads via `sched_getaffinity(2)`.
 #[cfg(target_os = "linux")]
 fn get_thread_count() -> Option<u32> {
-  let mut mask = [0u8; 128];
+  let mut mask = [0_u8; 128];
   let ret = unsafe {
-    crate::syscall::sys_sched_getaffinity(0, mask.len(), mask.as_mut_ptr())
+    microfetch_asm::sys_sched_getaffinity(0, mask.len(), mask.as_mut_ptr())
   };
   let bytes = usize::try_from(ret).ok()?;
-  let mut count = 0u32;
+  let mut count = 0_u32;
   for &byte in &mask[..bytes] {
     count += byte.count_ones();
   }
@@ -128,21 +130,17 @@ fn get_core_count(threads: u32) -> u32 {
 fn get_pe_cores() -> Option<(u32, u32)> {
   let perf = count_cpulist("/sys/devices/cpu_core/cpus")?;
   let eff = count_cpulist("/sys/devices/cpu_atom/cpus").unwrap_or(0);
-  if perf > 0 || eff > 0 {
-    Some((perf, eff))
-  } else {
-    None
-  }
+  (perf > 0 || eff > 0).then_some((perf, eff))
 }
 
 /// Parse a cpulist file and count listed CPUs.
 #[cfg(target_os = "linux")]
 fn count_cpulist(path: &str) -> Option<u32> {
-  let mut buf = [0u8; 64];
+  let mut buf = [0_u8; 64];
   let len = read_file_fast(path, &mut buf).ok()?;
   let data = &buf[..len];
 
-  let mut count = 0u32;
+  let mut count = 0_u32;
   let mut pos = 0;
   while pos < data.len() {
     // Parse start number
@@ -167,7 +165,7 @@ fn count_cpulist(path: &str) -> Option<u32> {
 /// Parse a decimal number from a byte slice, advancing the index.
 #[cfg(target_os = "linux")]
 fn parse_num(data: &[u8], pos: &mut usize) -> u32 {
-  let mut value = 0u32;
+  let mut value = 0_u32;
   while *pos < data.len() && data[*pos].is_ascii_digit() {
     value = value * 10 + u32::from(data[*pos] - b'0');
     *pos += 1;
@@ -183,11 +181,11 @@ fn format_cpufreq_path(buf: &mut [u8; 64], cpu: u32) -> usize {
   const SUFFIX: &[u8] = b"/cpufreq/cpuinfo_max_freq";
   buf[..PREFIX.len()].copy_from_slice(PREFIX);
   let mut pos = PREFIX.len();
-  let mut tmp = [0u8; 3];
+  let mut tmp = [0_u8; 3];
   let mut value = cpu;
   let mut digits = 0;
   loop {
-    tmp[digits] = b'0' + (value % 10) as u8;
+    tmp[digits] = b'0' + u8::try_from(value % 10).unwrap_or(0);
     digits += 1;
     value /= 10;
     if value == 0 {
@@ -206,14 +204,14 @@ fn format_cpufreq_path(buf: &mut [u8; 64], cpu: u32) -> usize {
 /// Read one CPU's `cpuinfo_max_freq`, in kHz.
 #[cfg(target_os = "linux")]
 fn read_cpu_max_khz(cpu: u32) -> Option<u32> {
-  let mut path = [0u8; 64];
+  let mut path = [0_u8; 64];
   let path_len = format_cpufreq_path(&mut path, cpu);
   // SAFETY: the path is a constant prefix, decimal digits, and a constant
   // suffix, so it is ASCII by construction.
   let path_str = unsafe { core::str::from_utf8_unchecked(&path[..path_len]) };
-  let mut buf = [0u8; 32];
+  let mut buf = [0_u8; 32];
   let len = read_file_fast(path_str, &mut buf).ok()?;
-  let mut khz = 0u32;
+  let mut khz = 0_u32;
   for &byte in &buf[..len] {
     if byte.is_ascii_digit() {
       khz = khz * 10 + u32::from(byte - b'0');
@@ -227,7 +225,7 @@ fn read_cpu_max_khz(cpu: u32) -> Option<u32> {
 // https://github.com/torvalds/linux/blob/v6.19/drivers/base/cpu.c#L273-L286
 #[cfg(target_os = "linux")]
 fn highest_present_cpu() -> Option<u32> {
-  let mut buf = [0u8; 64];
+  let mut buf = [0_u8; 64];
   let len = read_file_fast("/sys/devices/system/cpu/present", &mut buf).ok()?;
   let data = &buf[..len];
   let end = data.iter().rposition(u8::is_ascii_digit)? + 1;
@@ -235,7 +233,7 @@ fn highest_present_cpu() -> Option<u32> {
     .iter()
     .rposition(|byte| !byte.is_ascii_digit())
     .map_or(0, |pos| pos + 1);
-  let mut cpu = 0u32;
+  let mut cpu = 0_u32;
   for &byte in &data[start..end] {
     cpu = cpu * 10 + u32::from(byte - b'0');
   }
@@ -273,7 +271,7 @@ fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
   }
   // Fall back to cpuinfo fields
   for key in &[
-    b"cpu MHz" as &[u8],
+    b"cpu MHz".as_slice(),
     b"cpu MHz dynamic",
     b"cpu MHz static",
     b"CPU MHz",
@@ -283,7 +281,7 @@ fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
   ] {
     if let Some(val) = extract_field(cpuinfo, key) {
       // Parse integer part of the MHz value (e.g. "5200.00" -> 5200)
-      let mut mhz = 0u32;
+      let mut mhz = 0_u32;
       for &byte in val.as_bytes() {
         if byte == b'.' {
           break;
@@ -310,7 +308,7 @@ fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
   // SPARC exposes its clock as `Cpu0ClkTck : <hex>`,
   // which signifies ticks per second in hex.
   if let Some(val) = extract_field(cpuinfo, b"Cpu0ClkTck") {
-    let mut hz = 0u64;
+    let mut hz = 0_u64;
     let mut seen = false;
     for &byte in val.as_bytes() {
       let hex_digit = match byte {
@@ -339,22 +337,22 @@ fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
 /// Appends CPU frequency if available.
 #[cfg(target_os = "linux")]
 fn write_model_name(writer: &mut StackWriter) {
-  let mut buf = [0u8; 1024];
+  let mut buf = [0_u8; 1024];
   let Ok(len) = read_file_fast("/proc/cpuinfo", &mut buf) else {
     return;
   };
   let data = &buf[..len];
 
-  let mhz = get_cpu_freq_mhz(data);
+  let freq_mhz = get_cpu_freq_mhz(data);
   let named = match extract_name(data) {
     Some(name) => {
       // x86 `model name` already ends in `@ <clock>GHz`, which hides the
       // ` CPU` that trim() would otherwise strip, so re-trim after cutting.
-      let name = match (mhz, name.find(" @ ")) {
-        (Some(_), Some(at_pos)) => trim(&name[..at_pos]),
-        _ => name,
-      };
-      writer.push_str(name);
+      let clock_free = name.split_once(" @ ").map(|(head, _)| head);
+      match (freq_mhz, clock_free) {
+        (Some(_), Some(head)) => writer.push_str(trim(head)),
+        _ => writer.push_str(name),
+      }
       true
     },
     None => {
@@ -363,7 +361,7 @@ fn write_model_name(writer: &mut StackWriter) {
     },
   };
 
-  let Some(mhz) = mhz else {
+  let Some(mhz) = freq_mhz else {
     return;
   };
 
@@ -423,7 +421,7 @@ struct ArmPart {
 #[cfg(target_os = "linux")]
 const fn arm_part(part: u16, family: ArmFamily, model: &str) -> ArmPart {
   let bytes = model.as_bytes();
-  let mut padded = [0u8; 7];
+  let mut padded = [0_u8; 7];
   let mut index = 0;
   while index < bytes.len() {
     padded[index] = bytes[index];
@@ -494,12 +492,12 @@ static ARM_PARTS: [ArmPart; 45] = {
 fn write_arm_part(writer: &mut StackWriter, data: &[u8]) -> bool {
   let hex = |key| {
     let digits = extract_field(data, key)?.strip_prefix("0x")?;
-    let mut value = 0u32;
+    let mut value = 0_u32;
     for digit in digits
       .bytes()
       .map_while(|byte| char::from(byte).to_digit(16))
     {
-      value = value << 4 | digit;
+      value = (value << 4_u32) | digit;
     }
     Some(value)
   };
@@ -526,7 +524,7 @@ fn write_arm_part(writer: &mut StackWriter, data: &[u8]) -> bool {
 #[cfg(target_os = "linux")]
 fn extract_name(data: &[u8]) -> Option<&str> {
   for key in &[
-    b"model name" as &[u8],
+    b"model name".as_slice(),
     b"Model Name",
     b"uarch",
     b"cpu model",
@@ -551,7 +549,7 @@ fn extract_name(data: &[u8]) -> Option<&str> {
 /// the model portion after the comma.
 #[cfg(target_os = "linux")]
 fn write_dt_compatible(writer: &mut StackWriter) -> bool {
-  let mut buf = [0u8; 256];
+  let mut buf = [0_u8; 256];
   let Ok(len) =
     read_file_fast("/sys/firmware/devicetree/base/compatible", &mut buf)
   else {
@@ -618,50 +616,29 @@ fn extract_field<'data>(data: &'data [u8], key: &[u8]) -> Option<&'data str> {
 /// Strip noise from model names.
 #[cfg(target_os = "linux")]
 fn trim(name: &str) -> &str {
-  let bytes = name.as_bytes();
-  let mut end = bytes.len();
+  let mut rest = name.trim_ascii_end();
 
-  while end > 0 && bytes[end - 1].is_ascii_whitespace() {
-    end -= 1;
-  }
+  rest = rest
+    .strip_suffix(" Processor")
+    .or_else(|| rest.strip_suffix(" CPU"))
+    .unwrap_or(rest)
+    .trim_ascii_end();
 
-  if end >= 10 && &bytes[end - 10..end] == b" Processor" {
-    end -= 10;
-  } else if end >= 4 && &bytes[end - 4..end] == b" CPU" {
-    end -= 4;
-  }
-  while end > 0 && bytes[end - 1].is_ascii_whitespace() {
-    end -= 1;
-  }
+  rest = rest
+    .strip_suffix("(R)")
+    .or_else(|| rest.strip_suffix("(TM)"))
+    .or_else(|| rest.strip_suffix("(tm)"))
+    .unwrap_or(rest)
+    .trim_ascii_end();
 
-  if end >= 3 && &bytes[end - 3..end] == b"(R)" {
-    end -= 3;
-  } else if end >= 4
-    && (&bytes[end - 4..end] == b"(TM)" || &bytes[end - 4..end] == b"(tm)")
+  if rest.len() > 7
+    && let Some(head) = rest.strip_suffix("-Core")
+    && let Some(kept) = head
+      .trim_end_matches(|ch: char| ch.is_ascii_digit())
+      .strip_suffix(' ')
   {
-    end -= 4;
-  }
-  while end > 0 && bytes[end - 1].is_ascii_whitespace() {
-    end -= 1;
+    rest = kept.trim_ascii_end();
   }
 
-  if end > 7 && &bytes[end - 5..end] == b"-Core" {
-    let mut pos = end - 5;
-    while pos > 0 && bytes[pos - 1].is_ascii_digit() {
-      pos -= 1;
-    }
-    if pos > 0 && bytes[pos - 1] == b' ' {
-      end = pos - 1;
-    }
-  }
-  while end > 0 && bytes[end - 1].is_ascii_whitespace() {
-    end -= 1;
-  }
-
-  let mut start = 0;
-  while start < end && bytes[start].is_ascii_whitespace() {
-    start += 1;
-  }
-
-  &name[start..end]
+  rest.trim_ascii_start()
 }

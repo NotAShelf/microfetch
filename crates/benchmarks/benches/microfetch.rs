@@ -12,6 +12,10 @@ use microfetch_lib::{
   uptime,
 };
 
+#[expect(
+  clippy::expect_used,
+  reason = "the benchmarks cannot run without uname"
+)]
 fn main_benchmark(criterion: &mut Criterion) {
   let utsname = UtsName::uname().expect("Failed to get uname");
   let colors = Colors::new(false);
@@ -76,7 +80,7 @@ fn main_benchmark(criterion: &mut Criterion) {
     bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
       let mut writer = StackWriter::new(&mut buf);
-      uptime::write_uptime(&mut writer);
+      uptime::write(&mut writer);
       black_box(writer.written());
     });
   });

@@ -16,21 +16,7 @@ use core::{
   sync::atomic::{AtomicPtr, Ordering},
 };
 
-pub use microfetch_asm as syscall;
-pub use microfetch_asm::{
-  StatfsBuf,
-  SysInfo,
-  UtsNameBuf,
-  read_file_fast,
-  sys_close,
-  sys_open,
-  sys_read,
-  sys_sched_getaffinity,
-  sys_statfs,
-  sys_sysinfo,
-  sys_uname,
-  sys_write,
-};
+use microfetch_asm::{UtsNameBuf, sys_uname, sys_write};
 
 /// A simple error type for microfetch operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,7 +34,7 @@ pub enum Error {
 impl Error {
   /// Creates an error from the last OS error (reads errno).
   #[inline]
-  #[must_use]
+  #[must_use = "this only reads errno"]
   pub const fn last_os_error() -> Self {
     // This is a simplified version - in a real implementation,
     // we'd need to get the actual errno from the syscall return
@@ -74,14 +60,14 @@ pub unsafe fn init_env(envp: *const *const u8) {
 
 /// Gets the current environment pointer.
 #[inline]
-#[must_use]
+#[must_use = "this only reads the stored pointer"]
 fn get_envp() -> *const *const u8 {
   ENVP.load(Ordering::Acquire)
 }
 
 /// Gets an environment variable by name without using std or libc by reading
 /// from the environment pointer set by [`init_env`].
-#[must_use]
+#[must_use = "this only reads the environment"]
 pub fn getenv(name: &str) -> Option<&'static [u8]> {
   let envp = get_envp();
   if envp.is_null() {
@@ -144,51 +130,51 @@ pub fn getenv(name: &str) -> Option<&'static [u8]> {
 /// Environment variables set by the shell / login process are always valid
 /// UTF-8 on any real Linux system. We skip the `from_utf8` validation and use
 /// `from_utf8_unchecked`.
-#[must_use]
+#[must_use = "this only reads the environment"]
 pub fn getenv_str(name: &str) -> Option<&'static str> {
   getenv(name).map(|bytes| unsafe { core::str::from_utf8_unchecked(bytes) })
 }
 
 /// Checks if an environment variable exists (regardless of its value).
-#[must_use]
+#[must_use = "this only reads the environment"]
 pub fn env_exists(name: &str) -> bool {
   getenv(name).is_some()
 }
 
-/// Wrapper for `utsname` with safe accessor methods
+/// Wrapper for `utsname` with safe accessor methods.
 pub struct UtsName(UtsNameBuf);
 
 impl UtsName {
-  /// Calls `uname(2)` syscall and returns a `UtsName` wrapper
+  /// Calls `uname(2)` syscall and returns a `UtsName` wrapper.
   ///
   /// # Errors
   ///
-  /// Returns an error if the `uname` syscall fails
+  /// Returns an error if the `uname` syscall fails.
   pub fn uname() -> Result<Self, Error> {
     let mut uts = MaybeUninit::uninit();
-    if unsafe { sys_uname(uts.as_mut_ptr()) } != 0 {
+    if unsafe { sys_uname(uts.as_mut_ptr()) } != 0_i32 {
       return Err(Error::last_os_error());
     }
 
     Ok(Self(unsafe { uts.assume_init() }))
   }
 
-  #[must_use]
+  #[must_use = "this only borrows a field"]
   pub const fn nodename(&self) -> &CStr {
     unsafe { CStr::from_ptr(self.0.nodename.as_ptr().cast()) }
   }
 
-  #[must_use]
+  #[must_use = "this only borrows a field"]
   pub const fn sysname(&self) -> &CStr {
     unsafe { CStr::from_ptr(self.0.sysname.as_ptr().cast()) }
   }
 
-  #[must_use]
+  #[must_use = "this only borrows a field"]
   pub const fn release(&self) -> &CStr {
     unsafe { CStr::from_ptr(self.0.release.as_ptr().cast()) }
   }
 
-  #[must_use]
+  #[must_use = "this only borrows a field"]
   pub const fn machine(&self) -> &CStr {
     unsafe { CStr::from_ptr(self.0.machine.as_ptr().cast()) }
   }
@@ -207,7 +193,7 @@ impl<'buf> StackWriter<'buf> {
   }
 
   #[inline]
-  #[must_use]
+  #[must_use = "this only borrows the written bytes"]
   pub const fn written(&self) -> &[u8] {
     unsafe { core::slice::from_raw_parts(self.buf.as_ptr().cast(), self.pos) }
   }
@@ -226,7 +212,7 @@ impl<'buf> StackWriter<'buf> {
         self.buf.as_mut_ptr().add(self.pos).cast(),
         len,
       );
-    }
+    };
     self.pos += len;
   }
 
@@ -250,11 +236,11 @@ impl<'buf> StackWriter<'buf> {
       self.push_byte(b'0');
       return;
     }
-    let mut digits = [0u8; 20];
+    let mut digits = [0_u8; 20];
     let mut start = 20;
     while value > 0 {
       start -= 1;
-      digits[start] = b'0' + (value % 10) as u8;
+      digits[start] = b'0' + u8::try_from(value % 10).unwrap_or(0);
       value /= 10;
     }
     self.push_bytes(&digits[start..]);
@@ -265,7 +251,9 @@ impl<'buf> StackWriter<'buf> {
 /// environment variable. Set it to 11 newline-separated lines of ASCII/Unicode
 /// art when building to replace the default NixOS logo:
 ///
-///   `MICROFETCH_LOGO="$(cat my_logo.txt)"` cargo build --release
+/// ```sh
+/// MICROFETCH_LOGO="$(cat my_logo.txt)" cargo build --release
+/// ```
 ///
 /// Each line maps to one info row. When unset, the built-in two-tone NixOS
 /// logo is used.
@@ -325,7 +313,6 @@ const ROW_LABELS: &[u8] = concat!(
 
 /// Write one row: logo + label + value.
 #[inline(never)]
-#[allow(clippy::ref_option)]
 fn write_row(
   writer: &mut StackWriter,
   colors: &colors::Colors,
@@ -336,9 +323,9 @@ fn write_row(
   utsname: &UtsName,
 ) {
   writer.push_str("    ");
-  if let Some(custom_logo) = custom_logo {
+  if let Some(logo_text) = custom_logo {
     writer.push_str(colors.cyan);
-    writer.push_str(custom_logo);
+    writer.push_str(logo_text);
   } else {
     write_styled_row(writer, colors, logo);
   }
@@ -358,7 +345,7 @@ fn write_row(
     3 => cpu::write_cpu_name(writer),
     4 => cpu::write_cpu_cores(writer),
     5 => system::write_shell(writer),
-    6 => uptime::write_uptime(writer),
+    6 => uptime::write(writer),
     7 => desktop::write_desktop_info(writer),
     8 => system::write_memory_usage(writer, colors),
     9 => system::write_root_disk_usage(writer, colors),
@@ -371,7 +358,7 @@ fn write_row(
 fn print_version() {
   const VERSION: &str = concat!("Microfetch ", env!("CARGO_PKG_VERSION"), "\n");
   unsafe {
-    let _ = sys_write(1, VERSION.as_ptr(), VERSION.len());
+    _ = sys_write(1, VERSION.as_ptr(), VERSION.len());
   }
 }
 
@@ -382,7 +369,7 @@ fn print_version() {
 /// This function must be called with valid argc and argv from the program entry
 /// point.
 unsafe fn check_version_flag(argc: i32, argv: *const *const u8) -> bool {
-  if argc < 2 {
+  if argc < 2_i32 {
     return false;
   }
   // SAFETY: argv is a valid array of argc pointers
@@ -412,7 +399,7 @@ unsafe fn check_version_flag(argc: i32, argv: *const *const u8) -> bool {
 ///
 /// # Errors
 ///
-/// Returns an error if any system call fails
+/// Returns an error if any system call fails.
 ///
 /// # Safety
 ///

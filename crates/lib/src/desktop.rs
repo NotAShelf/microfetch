@@ -28,15 +28,9 @@ pub fn write_desktop_info(writer: &mut StackWriter) {
   writer.push_str(" (");
 
   // Capitalize first character of backend
-  if let Some(&first_byte) = backend_str.as_bytes().first() {
-    // Convert first byte to uppercase if it's ASCII lowercase
-    let upper = if first_byte.is_ascii_lowercase() {
-      first_byte - b'a' + b'A'
-    } else {
-      first_byte
-    };
-    writer.push_byte(upper);
-    writer.push_str(&backend_str[1..]);
+  if let Some((&first_byte, rest)) = backend_str.as_bytes().split_first() {
+    writer.push_byte(first_byte.to_ascii_uppercase());
+    writer.push_bytes(rest);
   }
 
   writer.push_byte(b')');

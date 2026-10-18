@@ -1,5 +1,6 @@
 #[cfg(target_os = "linux")]
-use crate::syscall::read_file_fast;
+use microfetch_asm::read_file_fast;
+
 use crate::{StackWriter, UtsName};
 
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
@@ -17,10 +18,11 @@ pub fn write_system_info(writer: &mut StackWriter, utsname: &UtsName) {
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_os_pretty_name(writer: &mut StackWriter) {
+  use microfetch_asm::darwin::macos_sysctl_str;
+
   writer.push_str("macOS");
-  let mut buf = [0u8; 64];
-  if let Some(len) =
-    crate::syscall::macos_sysctl_str(b"kern.osproductversion\0", &mut buf)
+  let mut buf = [0_u8; 64];
+  if let Some(len) = macos_sysctl_str(b"kern.osproductversion\0", &mut buf)
     && let Ok(version) = core::str::from_utf8(&buf[..len])
     && !version.is_empty()
   {
@@ -37,7 +39,7 @@ pub fn write_os_pretty_name(writer: &mut StackWriter) {
   // Fast byte-level scanning for PRETTY_NAME=
   const PREFIX: &[u8] = b"PRETTY_NAME=";
 
-  let mut buffer = [0u8; 1024];
+  let mut buffer = [0_u8; 1024];
 
   // Use fast syscall-based file reading
   let Ok(bytes_read) = read_file_fast("/etc/os-release", &mut buffer) else {

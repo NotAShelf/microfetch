@@ -7,11 +7,11 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "ecall",
-      in("a7") 56i64,  // SYS_openat
-      in("a0") -100i32,  // AT_FDCWD
+      in("a7") 56_i64,  // SYS_openat
+      in("a0") -100_i32,  // AT_FDCWD
       in("a1") path,
       in("a2") flags,
-      in("a3") 0i32,  // mode
+      in("a3") 0_i32,  // mode
       lateout("a0") ret,
       options(nostack)
     );
@@ -25,7 +25,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
     let ret: isize;
     core::arch::asm!(
       "ecall",
-      in("a7") 63i64,  // SYS_read
+      in("a7") 63_i64,  // SYS_read
       in("a0") fd,
       in("a1") buf,
       in("a2") count,
@@ -42,7 +42,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
     let ret: isize;
     core::arch::asm!(
       "ecall",
-      in("a7") 64i64,  // SYS_write
+      in("a7") 64_i64,  // SYS_write
       in("a0") fd,
       in("a1") buf,
       in("a2") count,
@@ -59,7 +59,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "ecall",
-      in("a7") 57i64,  // SYS_close
+      in("a7") 57_i64,  // SYS_close
       in("a0") fd,
       lateout("a0") ret,
       options(nostack)
@@ -73,7 +73,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "ecall",
-      in("a7") 160i64,  // SYS_uname
+      in("a7") 160_i64,  // SYS_uname
       in("a0") buf,
       lateout("a0") ret,
       options(nostack)
@@ -88,7 +88,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
     let ret: i32;
     core::arch::asm!(
       "ecall",
-      in("a7") 43i64,  // SYS_statfs
+      in("a7") 43_i64,  // SYS_statfs
       in("a0") path,
       in("a1") buf,
       lateout("a0") ret,
@@ -122,7 +122,7 @@ pub unsafe fn sys_sched_getaffinity(
     let ret: i32;
     core::arch::asm!(
       "ecall",
-      in("a7") 123i64,  // __NR_sched_getaffinity
+      in("a7") 123_i64,  // __NR_sched_getaffinity
       in("a0") pid,
       in("a1") mask_size,
       in("a2") mask,
@@ -137,7 +137,7 @@ pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe {
     core::arch::asm!(
       "ecall",
-      in("a7") 93i64,  // SYS_exit
+      in("a7") 93_i64,  // SYS_exit
       in("a0") code,
       options(noreturn, nostack)
     );

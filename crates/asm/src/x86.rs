@@ -11,9 +11,9 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
       "int 0x80",
       "pop ebx",
       arg1 = in(reg) path,
-      inlateout("eax") 5i32 => ret,  // SYS_open
+      inlateout("eax") 5_i32 => ret,  // SYS_open
       in("ecx") flags,
-      in("edx") 0i32,  // mode
+      in("edx") 0_i32,  // mode
     );
     ret
   }
@@ -28,7 +28,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
       "int 0x80",
       "pop ebx",
       arg1 = in(reg) fd,
-      inlateout("eax") 3i32 => ret,  // SYS_read
+      inlateout("eax") 3_i32 => ret,  // SYS_read
       in("ecx") buf,
       in("edx") count,
     );
@@ -45,7 +45,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
       "int 0x80",
       "pop ebx",
       arg1 = in(reg) fd,
-      inlateout("eax") 4i32 => ret,  // SYS_write
+      inlateout("eax") 4_i32 => ret,  // SYS_write
       in("ecx") buf,
       in("edx") count,
     );
@@ -62,7 +62,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
       "int 0x80",
       "pop ebx",
       arg1 = in(reg) fd,
-      inlateout("eax") 6i32 => ret,  // SYS_close
+      inlateout("eax") 6_i32 => ret,  // SYS_close
     );
     ret
   }
@@ -77,7 +77,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
       "int 0x80",
       "pop ebx",
       arg1 = in(reg) buf,
-      inlateout("eax") 122i32 => ret,  // SYS_newuname
+      inlateout("eax") 122_i32 => ret,  // SYS_newuname
     );
     ret
   }
@@ -92,7 +92,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
       "int 0x80",
       "pop ebx",
       arg1 = in(reg) path,
-      inlateout("eax") 268i32 => ret,  // SYS_statfs64
+      inlateout("eax") 268_i32 => ret,  // SYS_statfs64
       in("ecx") core::mem::size_of::<StatfsBuf>(),
       in("edx") buf,
     );
@@ -128,7 +128,7 @@ pub unsafe fn sys_sched_getaffinity(
       "int 0x80",
       "pop ebx",
       arg1 = in(reg) pid,
-      inlateout("eax") 242i32 => ret,  // __NR_sched_getaffinity
+      inlateout("eax") 242_i32 => ret,  // __NR_sched_getaffinity
       in("ecx") mask_size,
       in("edx") mask,
     );
@@ -142,7 +142,7 @@ pub unsafe fn sys_exit(code: i32) -> ! {
       "mov ebx, {code:e}",
       "int 0x80",
       code = in(reg) code,
-      in("eax") 1i32,  // SYS_exit
+      in("eax") 1_i32,  // SYS_exit
       options(noreturn)
     );
   }
