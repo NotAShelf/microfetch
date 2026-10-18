@@ -1,14 +1,28 @@
 version: 2
 updates:
-  # Update Cargo deps
   - package-ecosystem: cargo
-    directory: "/"
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
+    cooldown:
+      default-days: 7
 
-  # Update used workflows
   - package-ecosystem: github-actions
-    directory: "/"
+    directory: /
     schedule:
-      interval: daily
+      interval: weekly
+    cooldown:
+      default-days: 7
+      exclude: [manic-systems/*]
+    groups:
+      actions:
+        patterns: ["*"]
 
+  - package-ecosystem: nix
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: flake

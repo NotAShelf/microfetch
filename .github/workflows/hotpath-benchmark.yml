@@ -18,16 +18,15 @@ jobs:
     env:
       HOTPATH_BENCHMARK: microfetch
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          rustflags: ""
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
 
       - name: Install the wild linker
-        uses: wild-linker/action@v0.10.0
+        uses: wild-linker/action@dc926c45399e1842cf81e604f52bdf0ad86a0c09 # v0.10.0
       - name: Put wild on PATH
         run: echo "$RUNNER_TEMP/wild-install" >> "$GITHUB_PATH"
 
@@ -53,7 +52,7 @@ jobs:
           cargo run -q --release -p microfetch-bench --example hotpath \
             --features hotpath,hotpath-alloc,hotpath-cloud
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.event_name == 'pull_request'
         with:
           name: hotpath-report

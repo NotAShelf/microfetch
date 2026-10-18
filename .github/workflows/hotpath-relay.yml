@@ -1,14 +1,14 @@
 name: hotpath-relay
 
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers] hotpath relays the PR report artifact
     workflows: ["hotpath-benchmark"]
     types:
       - completed
 
 jobs:
   relay:
-    uses: pawurb/hotpath-rs/.github/workflows/hotpath-relay.yml@v0.28.5
+    uses: pawurb/hotpath-rs/.github/workflows/hotpath-relay.yml@3c6a2b5dd994da3db5a3d23e1cc6b91c542bec2a # v0.28.5
     permissions:
       actions: read
       id-token: write

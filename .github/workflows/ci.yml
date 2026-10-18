@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+jobs:
+  checks:
+    name: Checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-26.04-arm, macos-latest]
+    uses: manic-systems/workflows/.github/workflows/rust-checks.yml@4d2d4a73ac933d23f00fb7a17dd39569f8e1c1dc # v2.3.2
+    with:
+      os: ${{ matrix.os }}
+      flake-check: false
+      fmt: ${{ matrix.os == 'ubuntu-latest' }}
+      fmt-command: cargo fmt --all --check && taplo fmt --check
+      clippy: true
+      clippy-command: cargo clippy --locked --workspace --all-targets -- -D warnings
+      test: true
+      test-command: >-
+        cargo build --locked &&
+        cargo test --locked --workspace --exclude microfetch
+
+  cross:
+    name: Cross (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            toolchain: stable
+          - target: aarch64-unknown-linux-gnu
+            toolchain: stable
+          - target: riscv64gc-unknown-linux-gnu
+            toolchain: stable
+          - target: loongarch64-unknown-linux-gnu
+            toolchain: stable
+          - target: s390x-unknown-linux-gnu
+            toolchain: stable
+          # powerpc64 uses experimental asm features
+          - target: powerpc64le-unknown-linux-gnu
+            toolchain: nightly
+          - target: powerpc64-unknown-linux-gnu
+            toolchain: nightly
+          - target: armv7-unknown-linux-gnueabihf
+            toolchain: stable
+          # riscv32 is tier-3
+          - target: riscv32gc-unknown-linux-gnu
+            toolchain: nightly
+            build-std: true
+          # sparc64 uses experimental asm features
+          - target: sparc64-unknown-linux-gnu
+            toolchain: nightly
+          # mips64 is tier-3 and uses experimental asm features
+          - target: mips64-unknown-linux-gnuabi64
+            toolchain: nightly
+            build-std: true
+          - target: i686-unknown-linux-gnu
+            toolchain: stable
+          # powerpc uses experimental asm features
+          - target: powerpc-unknown-linux-gnu
+            toolchain: nightly
+          # mips is tier-3 and uses experimental asm features
+          - target: mips-unknown-linux-gnu
+            toolchain: nightly
+            build-std: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ !matrix.build-std && matrix.target || '' }}
+          components: ${{ matrix.build-std && 'rust-src' || '' }}
+
+      - name: Install wild
+        uses: wild-linker/action@dc926c45399e1842cf81e604f52bdf0ad86a0c09 # v0.10.0
+
+      - name: Put wild on PATH
+        run: echo "$RUNNER_TEMP/wild-install" >> "$GITHUB_PATH"
+
+      - name: Set up cross toolchain
+        uses: taiki-e/setup-cross-toolchain-action@12b7ad4acfa95a1476779d6c06699b96ec1691f8 # v1.42.0
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Build
+        env:
+          TARGET: ${{ matrix.target }}
+          BUILD_STD: ${{ matrix.build-std && 'core,alloc,panic_abort' || '' }}
+        run: cargo build --locked --target "$TARGET" ${BUILD_STD:+-Zbuild-std="$BUILD_STD"}
+
+      # tier-3 targets have no prebuilt std and tests are arch-agnostic, so
+      # run them against the host toolchain instead of the cross target.
+      - name: Test
+        env:
+          HOST_TARGET: ${{ matrix.build-std && 'x86_64-unknown-linux-gnu' || '' }}
+        run: cargo test --locked --workspace --exclude microfetch ${HOST_TARGET:+--target "$HOST_TARGET"}
+
+  actions:
+    name: Actions Lint
+    uses: manic-systems/workflows/.github/workflows/actions-lint.yml@4d2d4a73ac933d23f00fb7a17dd39569f8e1c1dc # v2.3.2
+
+  required:
+    name: Required Checks
+    if: always()
+    needs:
+      - checks
+      - cross
+      - actions
+    runs-on: ubuntu-latest
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
