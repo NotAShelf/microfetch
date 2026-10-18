@@ -1,6 +1,6 @@
+use crate::StackWriter;
 #[cfg(target_os = "linux")]
 use crate::syscall::read_file_fast;
-use crate::{Error, StackWriter};
 
 /// Writes CPU model name (trimmed) to the writer.
 #[cfg(target_os = "linux")]
@@ -26,35 +26,31 @@ pub fn write_cpu_name(w: &mut StackWriter) {
 /// Writes CPU core/thread info string.
 ///
 /// Format: `{cores} cores ({p}p/{e}e), {threads} threads` on hybrid Intel,
-/// `{cores} cores, {threads} threads` otherwise.
-///
-/// # Errors
-///
-/// Returns an error if the thread count cannot be determined.
+/// `{cores} cores, {threads} threads` otherwise. Writes nothing if the thread
+/// count cannot be determined.
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_cpu_cores(w: &mut StackWriter) -> Result<(), Error> {
-  let threads = get_thread_count()?;
+pub fn write_cpu_cores(w: &mut StackWriter) {
+  let Some(threads) = get_thread_count() else {
+    return;
+  };
   let cores = get_core_count(threads);
   write_cores(w, cores, get_pe_cores(), threads);
-  Ok(())
 }
 
 /// Writes CPU core/thread info via `sysctl` (macOS).
 ///
 /// On Apple Silicon `hw.perflevel0`/`hw.perflevel1` expose the performance
-/// (P) and efficiency (E) core counts respectively.
-///
-/// # Errors
-///
-/// Returns an error if the logical CPU count cannot be determined.
+/// (P) and efficiency (E) core counts respectively. Writes nothing if the
+/// logical CPU count cannot be determined.
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_cpu_cores(w: &mut StackWriter) -> Result<(), Error> {
+pub fn write_cpu_cores(w: &mut StackWriter) {
   use crate::syscall::macos_sysctl_u32;
 
-  let threads =
-    macos_sysctl_u32(b"hw.logicalcpu\0").ok_or(Error::OsError(0))?;
+  let Some(threads) = macos_sysctl_u32(b"hw.logicalcpu\0") else {
+    return;
+  };
   let cores = macos_sysctl_u32(b"hw.physicalcpu\0").unwrap_or(threads);
 
   // Performance/efficiency split (Apple Silicon). Only reported when both
@@ -68,7 +64,6 @@ pub fn write_cpu_cores(w: &mut StackWriter) -> Result<(), Error> {
   };
 
   write_cores(w, cores, pe, threads);
-  Ok(())
 }
 
 /// Writes core/thread counts identically across platforms:
@@ -100,13 +95,13 @@ fn write_cores(
 
 /// Count online threads via `sched_getaffinity(2)`.
 #[cfg(target_os = "linux")]
-fn get_thread_count() -> Result<u32, Error> {
+fn get_thread_count() -> Option<u32> {
   let mut mask = [0u8; 128];
   let ret = unsafe {
     crate::syscall::sys_sched_getaffinity(0, mask.len(), mask.as_mut_ptr())
   };
   if ret < 0 {
-    return Err(Error::from_raw_os_error(-ret));
+    return None;
   }
 
   #[allow(clippy::cast_sign_loss)]
@@ -115,7 +110,7 @@ fn get_thread_count() -> Result<u32, Error> {
   for &byte in &mask[..bytes] {
     count += byte.count_ones();
   }
-  Ok(count)
+  Some(count)
 }
 
 /// Derive physical core count from thread count and topology.

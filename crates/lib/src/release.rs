@@ -1,6 +1,6 @@
 #[cfg(target_os = "linux")]
 use crate::syscall::read_file_fast;
-use crate::{Error, StackWriter, UtsName};
+use crate::{StackWriter, UtsName};
 
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_system_info(w: &mut StackWriter, utsname: &UtsName) {
@@ -13,13 +13,10 @@ pub fn write_system_info(w: &mut StackWriter, utsname: &UtsName) {
 }
 
 /// Writes the OS name from `kern.osproductversion` (macOS), e.g. `macOS 14.5`.
-///
-/// # Errors
-///
-/// Never errors; falls back to `macOS` if the version sysctl is unavailable.
+/// Falls back to `macOS` if the version sysctl is unavailable.
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_os_pretty_name(w: &mut StackWriter) -> Result<(), Error> {
+pub fn write_os_pretty_name(w: &mut StackWriter) {
   w.push_str("macOS");
   let mut buf = [0u8; 64];
   if let Some(n) =
@@ -30,25 +27,22 @@ pub fn write_os_pretty_name(w: &mut StackWriter) -> Result<(), Error> {
     w.push_byte(b' ');
     w.push_str(version);
   }
-  Ok(())
 }
 
-/// Writes the pretty name of the OS from `/etc/os-release`.
-///
-/// # Errors
-///
-/// Returns an error if `/etc/os-release` cannot be read.
+/// Writes the pretty name of the OS from `/etc/os-release`, or nothing if it
+/// cannot be read.
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_os_pretty_name(w: &mut StackWriter) -> Result<(), Error> {
+pub fn write_os_pretty_name(w: &mut StackWriter) {
   // Fast byte-level scanning for PRETTY_NAME=
   const PREFIX: &[u8] = b"PRETTY_NAME=";
 
   let mut buffer = [0u8; 1024];
 
   // Use fast syscall-based file reading
-  let bytes_read = read_file_fast("/etc/os-release", &mut buffer)
-    .map_err(Error::from_raw_os_error)?;
+  let Ok(bytes_read) = read_file_fast("/etc/os-release", &mut buffer) else {
+    return;
+  };
   let content = &buffer[..bytes_read];
   let mut offset = 0;
 
@@ -79,12 +73,11 @@ pub fn write_os_pretty_name(w: &mut StackWriter) -> Result<(), Error> {
       // valid UTF-8 (ASCII names, version numbers). No lossy conversion
       // needed.
       w.push_bytes(trimmed);
-      return Ok(());
+      return;
     }
 
     offset += line_end + 1;
   }
 
   w.push_str("Unknown");
-  Ok(())
 }
