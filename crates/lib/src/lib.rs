@@ -54,13 +54,6 @@ impl Error {
     // we'd need to get the actual errno from the syscall return
     Self::OsError(0)
   }
-
-  /// Creates an error from a raw OS error code (negative errno from syscall).
-  #[inline]
-  #[must_use]
-  pub const fn from_raw_os_error(errno: i32) -> Self {
-    Self::OsError(-errno)
-  }
 }
 
 // Store the environment pointer internally,initialized from `main()`. This
@@ -357,25 +350,15 @@ fn write_row(
       w.push_str(" ~");
       w.push_str(c.reset);
     },
-    1 => {
-      let _ = release::write_os_pretty_name(w);
-    },
+    1 => release::write_os_pretty_name(w),
     2 => release::write_system_info(w, utsname),
     3 => cpu::write_cpu_name(w),
-    4 => {
-      let _ = cpu::write_cpu_cores(w);
-    },
+    4 => cpu::write_cpu_cores(w),
     5 => system::write_shell(w),
-    6 => {
-      let _ = uptime::write_uptime(w);
-    },
+    6 => uptime::write_uptime(w),
     7 => desktop::write_desktop_info(w),
-    8 => {
-      let _ = system::write_memory_usage(w, c);
-    },
-    9 => {
-      let _ = system::write_root_disk_usage(w, c);
-    },
+    8 => system::write_memory_usage(w, c),
+    9 => system::write_root_disk_usage(w, c),
     _ => colors::write_dots(w, c),
   }
   w.push_byte(b'\n');

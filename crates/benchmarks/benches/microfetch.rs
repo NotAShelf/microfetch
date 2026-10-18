@@ -28,7 +28,7 @@ fn main_benchmark(c: &mut Criterion) {
     b.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
       let mut w = StackWriter::new(&mut buf);
-      let _ = release::write_os_pretty_name(&mut w);
+      release::write_os_pretty_name(&mut w);
       black_box(w.written());
     });
   });
@@ -52,7 +52,7 @@ fn main_benchmark(c: &mut Criterion) {
     b.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
       let mut w = StackWriter::new(&mut buf);
-      let _ = cpu::write_cpu_cores(&mut w);
+      cpu::write_cpu_cores(&mut w);
       black_box(w.written());
     });
   });
@@ -76,7 +76,7 @@ fn main_benchmark(c: &mut Criterion) {
     b.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
       let mut w = StackWriter::new(&mut buf);
-      let _ = uptime::write_uptime(&mut w);
+      uptime::write_uptime(&mut w);
       black_box(w.written());
     });
   });
@@ -84,7 +84,7 @@ fn main_benchmark(c: &mut Criterion) {
     b.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
       let mut w = StackWriter::new(&mut buf);
-      let _ = system::write_memory_usage(&mut w, &colors);
+      system::write_memory_usage(&mut w, &colors);
       black_box(w.written());
     });
   });
@@ -92,7 +92,7 @@ fn main_benchmark(c: &mut Criterion) {
     b.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
       let mut w = StackWriter::new(&mut buf);
-      let _ = system::write_root_disk_usage(&mut w, &colors);
+      system::write_root_disk_usage(&mut w, &colors);
       black_box(w.written());
     });
   });

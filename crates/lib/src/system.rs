@@ -3,7 +3,6 @@ use core::mem::MaybeUninit;
 #[cfg(target_os = "linux")]
 use crate::syscall::read_file_fast;
 use crate::{
-  Error,
   StackWriter,
   UtsName,
   colors::Colors,
@@ -39,21 +38,15 @@ pub fn write_shell(w: &mut StackWriter) {
   }
 }
 
-/// Gets the root disk usage information.
-///
-/// # Errors
-///
-/// Returns an error if the filesystem information cannot be retrieved.
+/// Writes the root disk usage, or nothing if the filesystem information cannot
+/// be retrieved.
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_root_disk_usage(
-  w: &mut StackWriter,
-  colors: &Colors,
-) -> Result<(), Error> {
+pub fn write_root_disk_usage(w: &mut StackWriter, colors: &Colors) {
   let mut vfs = MaybeUninit::<StatfsBuf>::uninit();
   let path = b"/\0";
 
   if unsafe { sys_statfs(path.as_ptr(), vfs.as_mut_ptr()) } != 0 {
-    return Err(Error::last_os_error());
+    return;
   }
 
   let vfs = unsafe { vfs.assume_init() };
@@ -75,8 +68,6 @@ pub fn write_root_disk_usage(
   w.push_byte(b'%');
   w.push_str(colors.reset);
   w.push_byte(b')');
-
-  Ok(())
 }
 
 fn write_centi_gib(w: &mut StackWriter, centi_gib: u64) {
@@ -112,18 +103,13 @@ fn parse_u64_fast(s: &[u8]) -> u64 {
 }
 
 /// Writes the system memory usage information via `sysctl`/Mach (macOS).
-///
-/// # Errors
-///
-/// Returns an error if the memory statistics cannot be retrieved.
+/// Writes nothing if the memory statistics cannot be retrieved.
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_memory_usage(
-  w: &mut StackWriter,
-  colors: &Colors,
-) -> Result<(), Error> {
-  let (used_bytes, total_bytes) =
-    crate::syscall::macos_meminfo().ok_or(Error::OsError(0))?;
+pub fn write_memory_usage(w: &mut StackWriter, colors: &Colors) {
+  let Some((used_bytes, total_bytes)) = crate::syscall::macos_meminfo() else {
+    return;
+  };
   let percentage_used = (used_bytes * 100 + total_bytes / 2)
     .checked_div(total_bytes)
     .unwrap_or(0);
@@ -137,30 +123,21 @@ pub fn write_memory_usage(
   w.push_byte(b'%');
   w.push_str(colors.reset);
   w.push_byte(b')');
-
-  Ok(())
 }
 
 /// Gets the system memory usage information.
-///
-/// # Errors
-///
-/// Returns an error if `/proc/meminfo` cannot be read.
+/// Writes nothing if `/proc/meminfo` cannot be read.
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_memory_usage(
-  w: &mut StackWriter,
-  colors: &Colors,
-) -> Result<(), Error> {
+pub fn write_memory_usage(w: &mut StackWriter, colors: &Colors) {
   #[cfg_attr(feature = "hotpath", hotpath::measure)]
-  fn parse_memory_info() -> Result<(u64, u64), Error> {
+  fn parse_memory_info() -> Option<(u64, u64)> {
     let mut total_memory_kb = 0u64;
     let mut available_memory_kb = 0u64;
     let mut buffer = [0u8; 1024];
 
     // Use fast syscall-based file reading
-    let bytes_read = read_file_fast("/proc/meminfo", &mut buffer)
-      .map_err(Error::from_raw_os_error)?;
+    let bytes_read = read_file_fast("/proc/meminfo", &mut buffer).ok()?;
     let meminfo = &buffer[..bytes_read];
 
     // Fast scanning for MemTotal and MemAvailable
@@ -199,10 +176,12 @@ pub fn write_memory_usage(
       offset += line_end + 1;
     }
 
-    Ok((total_memory_kb - available_memory_kb, total_memory_kb))
+    Some((total_memory_kb - available_memory_kb, total_memory_kb))
   }
 
-  let (used_kb, total_kb) = parse_memory_info()?;
+  let Some((used_kb, total_kb)) = parse_memory_info() else {
+    return;
+  };
   let percentage_used = (used_kb * 100 + total_kb / 2)
     .checked_div(total_kb)
     .unwrap_or(0);
@@ -216,6 +195,4 @@ pub fn write_memory_usage(
   w.push_byte(b'%');
   w.push_str(colors.reset);
   w.push_byte(b')');
-
-  Ok(())
 }
