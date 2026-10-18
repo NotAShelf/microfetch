@@ -91,20 +91,20 @@ pub fn getenv(name: &str) -> Option<&'static [u8]> {
   let name_bytes = name.as_bytes();
 
   // Walk through environment variables
-  let mut i = 0;
+  let mut env_index = 0;
   loop {
     // SAFETY: environ is null-terminated array of pointers
-    let entry = unsafe { *envp.add(i) };
+    let entry = unsafe { *envp.add(env_index) };
     if entry.is_null() {
       break;
     }
 
     // Check if this entry starts with our variable name followed by '='
     let mut matches = true;
-    for (j, &b) in name_bytes.iter().enumerate() {
+    for (name_index, &name_byte) in name_bytes.iter().enumerate() {
       // SAFETY: entry is a valid C string
-      let entry_byte = unsafe { *entry.add(j) };
-      if entry_byte != b {
+      let entry_byte = unsafe { *entry.add(name_index) };
+      if entry_byte != name_byte {
         matches = false;
         break;
       }
@@ -120,8 +120,8 @@ pub fn getenv(name: &str) -> Option<&'static [u8]> {
         let mut len = 0;
         loop {
           // SAFETY: entry is a valid C string
-          let b = unsafe { *value_start.add(len) };
-          if b == 0 {
+          let value_byte = unsafe { *value_start.add(len) };
+          if value_byte == 0 {
             break;
           }
           len += 1;
@@ -131,7 +131,7 @@ pub fn getenv(name: &str) -> Option<&'static [u8]> {
       }
     }
 
-    i += 1;
+    env_index += 1;
   }
 
   None
@@ -195,14 +195,14 @@ impl UtsName {
 }
 
 /// Minimal, stack-allocated writer.
-pub struct StackWriter<'a> {
-  buf: &'a mut [MaybeUninit<u8>],
+pub struct StackWriter<'buf> {
+  buf: &'buf mut [MaybeUninit<u8>],
   pos: usize,
 }
 
-impl<'a> StackWriter<'a> {
+impl<'buf> StackWriter<'buf> {
   #[inline]
-  pub const fn new(buf: &'a mut [MaybeUninit<u8>]) -> Self {
+  pub const fn new(buf: &'buf mut [MaybeUninit<u8>]) -> Self {
     Self { buf, pos: 0 }
   }
 
@@ -213,51 +213,51 @@ impl<'a> StackWriter<'a> {
   }
 
   #[inline]
-  pub fn push_str(&mut self, s: &str) {
-    self.push_bytes(s.as_bytes());
+  pub fn push_str(&mut self, text: &str) {
+    self.push_bytes(text.as_bytes());
   }
 
   #[inline(never)]
   pub fn push_bytes(&mut self, bytes: &[u8]) {
-    let n = bytes.len().min(self.buf.len() - self.pos);
+    let len = bytes.len().min(self.buf.len() - self.pos);
     unsafe {
       core::ptr::copy_nonoverlapping(
         bytes.as_ptr(),
         self.buf.as_mut_ptr().add(self.pos).cast(),
-        n,
+        len,
       );
     }
-    self.pos += n;
+    self.pos += len;
   }
 
   #[inline]
-  pub const fn push_byte(&mut self, b: u8) {
+  pub const fn push_byte(&mut self, byte: u8) {
     if self.pos < self.buf.len() {
-      self.buf[self.pos].write(b);
+      self.buf[self.pos].write(byte);
       self.pos += 1;
     }
   }
 
   /// Write a [`CStr`]'s bytes (excluding the null terminator).
   #[inline]
-  pub fn push_cstr(&mut self, s: &CStr) {
-    self.push_bytes(s.to_bytes());
+  pub fn push_cstr(&mut self, cstr: &CStr) {
+    self.push_bytes(cstr.to_bytes());
   }
 
   /// Write a u64 as decimal ASCII.
-  pub fn push_u64(&mut self, mut n: u64) {
-    if n == 0 {
+  pub fn push_u64(&mut self, mut value: u64) {
+    if value == 0 {
       self.push_byte(b'0');
       return;
     }
-    let mut tmp = [0u8; 20];
-    let mut i = 20;
-    while n > 0 {
-      i -= 1;
-      tmp[i] = b'0' + (n % 10) as u8;
-      n /= 10;
+    let mut digits = [0u8; 20];
+    let mut start = 20;
+    while value > 0 {
+      start -= 1;
+      digits[start] = b'0' + (value % 10) as u8;
+      value /= 10;
     }
-    self.push_bytes(&tmp[i..]);
+    self.push_bytes(&digits[start..]);
   }
 }
 
@@ -270,7 +270,7 @@ impl<'a> StackWriter<'a> {
 /// Each line maps to one info row. When unset, the built-in two-tone NixOS
 /// logo is used.
 const CUSTOM_LOGO: &str = match option_env!("MICROFETCH_LOGO") {
-  Some(s) => s,
+  Some(logo) => logo,
   None => "",
 };
 
@@ -280,27 +280,30 @@ const LOGO: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/logo.bin"));
 /// Write one row from a packed color-marked byte stream.
 #[inline(never)]
 fn write_styled_row(
-  w: &mut StackWriter,
-  c: &colors::Colors,
+  writer: &mut StackWriter,
+  colors: &colors::Colors,
   stream: &mut &[u8],
 ) {
-  let colors = [c.blue, c.cyan, c.reset];
+  let palette = [colors.blue, colors.cyan, colors.reset];
   let data = *stream;
-  let row_end = data.iter().position(|&b| b == 0).unwrap_or(data.len());
+  let row_end = data
+    .iter()
+    .position(|&byte| byte == 0)
+    .unwrap_or(data.len());
   let row_data = &data[..row_end];
   *stream = data.get(row_end + 1..).unwrap_or(&[]);
 
-  let mut i = 0;
-  while i < row_data.len() {
-    if let marker @ 1..=3 = row_data[i] {
-      w.push_str(colors[usize::from(marker - 1)]);
-      i += 1;
+  let mut pos = 0;
+  while pos < row_data.len() {
+    if let marker @ 1..=3 = row_data[pos] {
+      writer.push_str(palette[usize::from(marker - 1)]);
+      pos += 1;
     } else {
-      let chunk_start = i;
-      while i < row_data.len() && row_data[i] > 3 {
-        i += 1;
+      let chunk_start = pos;
+      while pos < row_data.len() && row_data[pos] > 3 {
+        pos += 1;
       }
-      w.push_bytes(&row_data[chunk_start..i]);
+      writer.push_bytes(&row_data[chunk_start..pos]);
     }
   }
 }
@@ -324,44 +327,44 @@ const ROW_LABELS: &[u8] = concat!(
 #[inline(never)]
 #[allow(clippy::ref_option)]
 fn write_row(
-  w: &mut StackWriter,
-  c: &colors::Colors,
+  writer: &mut StackWriter,
+  colors: &colors::Colors,
   row: usize,
   custom_logo: Option<&str>,
   logo: &mut &[u8],
   labels: &mut &[u8],
   utsname: &UtsName,
 ) {
-  w.push_str("    ");
+  writer.push_str("    ");
   if let Some(custom_logo) = custom_logo {
-    w.push_str(c.cyan);
-    w.push_str(custom_logo);
+    writer.push_str(colors.cyan);
+    writer.push_str(custom_logo);
   } else {
-    write_styled_row(w, c, logo);
+    write_styled_row(writer, colors, logo);
   }
-  w.push_str(c.reset);
-  w.push_str("  ");
+  writer.push_str(colors.reset);
+  writer.push_str("  ");
   if row != 0 {
-    write_styled_row(w, c, labels);
+    write_styled_row(writer, colors, labels);
   }
   match row {
     0 => {
-      system::write_username_and_hostname(w, c, utsname);
-      w.push_str(" ~");
-      w.push_str(c.reset);
+      system::write_username_and_hostname(writer, colors, utsname);
+      writer.push_str(" ~");
+      writer.push_str(colors.reset);
     },
-    1 => release::write_os_pretty_name(w),
-    2 => release::write_system_info(w, utsname),
-    3 => cpu::write_cpu_name(w),
-    4 => cpu::write_cpu_cores(w),
-    5 => system::write_shell(w),
-    6 => uptime::write_uptime(w),
-    7 => desktop::write_desktop_info(w),
-    8 => system::write_memory_usage(w, c),
-    9 => system::write_root_disk_usage(w, c),
-    _ => colors::write_dots(w, c),
+    1 => release::write_os_pretty_name(writer),
+    2 => release::write_system_info(writer, utsname),
+    3 => cpu::write_cpu_name(writer),
+    4 => cpu::write_cpu_cores(writer),
+    5 => system::write_shell(writer),
+    6 => uptime::write_uptime(writer),
+    7 => desktop::write_desktop_info(writer),
+    8 => system::write_memory_usage(writer, colors),
+    9 => system::write_root_disk_usage(writer, colors),
+    _ => colors::write_dots(writer, colors),
   }
-  w.push_byte(b'\n');
+  writer.push_byte(b'\n');
 }
 
 /// Print version information using direct syscall.
@@ -389,10 +392,10 @@ unsafe fn check_version_flag(argc: i32, argv: *const *const u8) -> bool {
   }
   // Check if arg1 is "--version"
   let version_flag = b"--version\0";
-  for (i, &b) in version_flag.iter().enumerate() {
+  for (flag_index, &flag_byte) in version_flag.iter().enumerate() {
     // SAFETY: arg1 is a valid C string
-    let arg_byte = unsafe { *arg1.add(i) };
-    if arg_byte != b {
+    let arg_byte = unsafe { *arg1.add(flag_index) };
+    if arg_byte != flag_byte {
       return false;
     }
   }
@@ -423,10 +426,10 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
 
   let utsname = UtsName::uname()?;
   let no_color = colors::is_no_color();
-  let c = colors::Colors::new(no_color);
+  let colors = colors::Colors::new(no_color);
 
   let mut buf = [MaybeUninit::uninit(); 2560];
-  let mut w = StackWriter::new(&mut buf);
+  let mut writer = StackWriter::new(&mut buf);
 
   // Custom logo is 11 lines from MICROFETCH_LOGO env var, one per info row.
   // Lines beyond 11 are ignored; missing lines render as empty.
@@ -442,12 +445,12 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
   let mut logo = LOGO;
   let mut labels = ROW_LABELS;
 
-  w.push_byte(b'\n');
+  writer.push_byte(b'\n');
 
   for (row, &line) in logo_lines.iter().enumerate() {
     write_row(
-      &mut w,
-      &c,
+      &mut writer,
+      &colors,
       row,
       use_custom.then_some(line),
       &mut logo,
@@ -456,10 +459,10 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
     );
   }
 
-  w.push_byte(b'\n');
+  writer.push_byte(b'\n');
 
   // Single syscall for the entire output.
-  let out = w.written();
+  let out = writer.written();
   let written = unsafe { sys_write(1, out.as_ptr(), out.len()) };
   let Ok(count) = usize::try_from(written) else {
     return Err(

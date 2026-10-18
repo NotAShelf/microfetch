@@ -3,29 +3,29 @@ use crate::syscall::read_file_fast;
 use crate::{StackWriter, UtsName};
 
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_system_info(w: &mut StackWriter, utsname: &UtsName) {
-  w.push_cstr(utsname.sysname());
-  w.push_byte(b' ');
-  w.push_cstr(utsname.release());
-  w.push_str(" (");
-  w.push_cstr(utsname.machine());
-  w.push_byte(b')');
+pub fn write_system_info(writer: &mut StackWriter, utsname: &UtsName) {
+  writer.push_cstr(utsname.sysname());
+  writer.push_byte(b' ');
+  writer.push_cstr(utsname.release());
+  writer.push_str(" (");
+  writer.push_cstr(utsname.machine());
+  writer.push_byte(b')');
 }
 
 /// Writes the OS name from `kern.osproductversion` (macOS), e.g. `macOS 14.5`.
 /// Falls back to `macOS` if the version sysctl is unavailable.
 #[cfg(target_os = "macos")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_os_pretty_name(w: &mut StackWriter) {
-  w.push_str("macOS");
+pub fn write_os_pretty_name(writer: &mut StackWriter) {
+  writer.push_str("macOS");
   let mut buf = [0u8; 64];
-  if let Some(n) =
+  if let Some(len) =
     crate::syscall::macos_sysctl_str(b"kern.osproductversion\0", &mut buf)
-    && let Ok(version) = core::str::from_utf8(&buf[..n])
+    && let Ok(version) = core::str::from_utf8(&buf[..len])
     && !version.is_empty()
   {
-    w.push_byte(b' ');
-    w.push_str(version);
+    writer.push_byte(b' ');
+    writer.push_str(version);
   }
 }
 
@@ -33,7 +33,7 @@ pub fn write_os_pretty_name(w: &mut StackWriter) {
 /// cannot be read.
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_os_pretty_name(w: &mut StackWriter) {
+pub fn write_os_pretty_name(writer: &mut StackWriter) {
   // Fast byte-level scanning for PRETTY_NAME=
   const PREFIX: &[u8] = b"PRETTY_NAME=";
 
@@ -52,7 +52,7 @@ pub fn write_os_pretty_name(w: &mut StackWriter) {
     // Find newline or end
     let line_end = remaining
       .iter()
-      .position(|&b| b == b'\n')
+      .position(|&byte| byte == b'\n')
       .unwrap_or(remaining.len());
     let line = &remaining[..line_end];
 
@@ -72,12 +72,12 @@ pub fn write_os_pretty_name(w: &mut StackWriter) {
       // Write bytes directly — os-release values are effectively always
       // valid UTF-8 (ASCII names, version numbers). No lossy conversion
       // needed.
-      w.push_bytes(trimmed);
+      writer.push_bytes(trimmed);
       return;
     }
 
     offset += line_end + 1;
   }
 
-  w.push_str("Unknown");
+  writer.push_str("Unknown");
 }

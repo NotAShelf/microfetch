@@ -5,7 +5,7 @@ use crate::StackWriter;
 
 /// Writes the current system uptime, or nothing if it cannot be retrieved.
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_uptime(w: &mut StackWriter) {
+pub fn write_uptime(writer: &mut StackWriter) {
   #[cfg(target_os = "linux")]
   let uptime_seconds = {
     let mut info = MaybeUninit::uninit();
@@ -29,26 +29,26 @@ pub fn write_uptime(w: &mut StackWriter) {
   let mut any = days > 0;
 
   if any {
-    w.push_u64(days);
-    w.push_str(if days == 1 { " day" } else { " days" });
+    writer.push_u64(days);
+    writer.push_str(if days == 1 { " day" } else { " days" });
   }
   if hours > 0 {
     if any {
-      w.push_str(", ");
+      writer.push_str(", ");
     }
-    w.push_u64(hours);
-    w.push_str(if hours == 1 { " hour" } else { " hours" });
+    writer.push_u64(hours);
+    writer.push_str(if hours == 1 { " hour" } else { " hours" });
     any = true;
   }
   if minutes > 0 {
     if any {
-      w.push_str(", ");
+      writer.push_str(", ");
     }
-    w.push_u64(minutes);
-    w.push_str(if minutes == 1 { " minute" } else { " minutes" });
+    writer.push_u64(minutes);
+    writer.push_str(if minutes == 1 { " minute" } else { " minutes" });
     any = true;
   }
   if !any {
-    w.push_str("less than a minute");
+    writer.push_str("less than a minute");
   }
 }

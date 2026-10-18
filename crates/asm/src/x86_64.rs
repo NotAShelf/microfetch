@@ -4,19 +4,19 @@ use super::{StatfsBuf, SysInfo, UtsNameBuf};
 
 pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe {
-    let fd: i32;
+    let ret: i32;
     core::arch::asm!(
       "syscall",
       in("rax") 2i64,  // SYS_open
       in("rdi") path,
       in("rsi") flags,
       in("rdx") 0i32,  // mode (not used for reading)
-      lateout("rax") fd,
+      lateout("rax") ret,
       lateout("rcx") _,
       lateout("r11") _,
       options(nostack)
     );
-    fd
+    ret
   }
 }
 

@@ -28,12 +28,12 @@ fn main() {
   ];
 
   let mut out = Vec::new();
-  for (i, row) in rows.iter().enumerate() {
+  for (row_index, row) in rows.iter().enumerate() {
     for &(color, text) in *row {
       out.push(color + 1);
       out.extend_from_slice(text.as_bytes());
     }
-    if i < rows.len() - 1 {
+    if row_index < rows.len() - 1 {
       out.push(0);
     }
   }
