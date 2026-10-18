@@ -1,4 +1,23 @@
+use std::{env, process::Command};
+
 fn main() {
+  let rustc = env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+  let version = Command::new(rustc)
+    .arg("-vV")
+    .output()
+    .expect("failed to run `rustc -vV`");
+  let nightly = String::from_utf8_lossy(&version.stdout)
+    .lines()
+    .any(|line| {
+      line.starts_with("release:")
+        && (line.contains("-nightly") || line.contains("-dev"))
+    });
+
+  println!("cargo::rustc-check-cfg=cfg(nightly)");
+  if nightly {
+    println!("cargo::rustc-cfg=nightly");
+  }
+
   // These flags only apply to the microfetch binary, not to proc-macro crates
   // or other host-compiled artifacts.
 

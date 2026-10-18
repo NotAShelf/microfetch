@@ -9,6 +9,7 @@
   ),
   feature(asm_experimental_arch)
 )]
+#![cfg_attr(nightly, feature(lang_items))]
 
 #[cfg(not(target_os = "macos"))] use core::arch::naked_asm;
 
@@ -338,8 +339,16 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
   }
 }
 
-// Stubs for Rust exception handling
-#[cfg(not(test))]
+/// Stubs for Rust exception handling
+///
+/// Nightly mangles this symbol with a per-compiler hash since
+/// https://github.com/rust-lang/rust/pull/148413, so only the lang item can name
+/// it there.
+#[cfg(all(not(test), nightly))]
+#[lang = "eh_personality"]
+const extern "C" fn rust_eh_personality() {}
+
+#[cfg(all(not(test), not(nightly)))]
 #[unsafe(no_mangle)]
 const extern "C" fn rust_eh_personality() {}
 
