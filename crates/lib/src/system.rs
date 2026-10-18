@@ -46,14 +46,8 @@ pub fn write_root_disk_usage(writer: &mut StackWriter, colors: &Colors) {
   }
 
   let vfs = unsafe { vfs_buf.assume_init() };
-  #[allow(
-    clippy::unnecessary_fallible_conversions,
-    reason = "f_bsize is a signed long on most targets but u32 on macOS, \
-              s390x, and 32-bit"
-  )]
-  let Some(block_size) = u64::try_from(vfs.f_bsize).ok() else {
-    return;
-  };
+  let block_size = vfs.block_size();
+
   let total_blocks = vfs.f_blocks;
   let available_blocks = vfs.f_bavail;
 

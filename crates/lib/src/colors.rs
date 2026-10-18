@@ -54,7 +54,7 @@ pub fn write_dots(writer: &mut StackWriter, colors: &Colors) {
     colors.magenta,
   ] {
     writer.push_str(color);
-    writer.push_str("●  ");
+    writer.push_str("\u{25cf}  ");
   }
   writer.push_str(colors.reset);
 }
