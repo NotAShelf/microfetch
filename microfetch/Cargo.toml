@@ -10,12 +10,12 @@ repository             = "https://github.com/notashelf/microfetch"
 publish                = true
 
 [[bin]]
-name       = "microfetch"
-test       = false
+name = "microfetch"
+test = false
 
 [dependencies]
-microfetch-asm.workspace   = true
-microfetch-lib.workspace   = true
+microfetch-asm.workspace = true
+microfetch-lib.workspace = true
 
 [lints]
 workspace = true
