@@ -138,7 +138,7 @@ pub fn macos_sysctl_str(name: &[u8], out: &mut [u8]) -> Option<usize> {
 /// Read a 32-bit integer sysctl by name (e.g. `b"hw.logicalcpu\0"`).
 #[must_use = "this only queries the kernel"]
 pub fn macos_sysctl_u32(name: &[u8]) -> Option<u32> {
-  let mut val: u32 = 0;
+  let mut val = 0_u32;
   let mut len = size_of::<u32>();
   let ret = unsafe {
     sysctlbyname(
@@ -154,7 +154,7 @@ pub fn macos_sysctl_u32(name: &[u8]) -> Option<u32> {
 
 /// Read a 64-bit integer sysctl by name (e.g. `b"hw.memsize\0"`).
 fn macos_sysctl_u64(name: &[u8]) -> Option<u64> {
-  let mut val: u64 = 0;
+  let mut val = 0_u64;
   let mut len = size_of::<u64>();
   let ret = unsafe {
     sysctlbyname(
