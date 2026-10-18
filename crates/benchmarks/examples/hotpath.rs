@@ -13,16 +13,18 @@ use std::{env, os::unix::ffi::OsStringExt as _};
   reason = "a profiling example has nowhere to report errors"
 )]
 fn main() {
-  let env: Vec<CString> = env::vars_os()
+  let env = env::vars_os()
     .map(|(key, value)| {
       let mut entry = key.into_vec();
       entry.push(b'=');
       entry.extend(value.into_vec());
       CString::new(entry).expect("environment entries contain no NUL bytes")
     })
-    .collect();
-  let mut envp: Vec<*const u8> =
-    env.iter().map(|entry| entry.as_ptr().cast()).collect();
+    .collect::<Vec<CString>>();
+  let mut envp = env
+    .iter()
+    .map(|entry| entry.as_ptr().cast::<u8>())
+    .collect::<Vec<*const u8>>();
   envp.push(ptr::null());
   let argv = [c"microfetch".as_ptr().cast::<u8>(), ptr::null()];
 
