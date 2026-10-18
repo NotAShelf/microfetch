@@ -380,7 +380,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
 ///
 /// Linux ABI (`x86_64` and `aarch64`): the fields we use are at the same
 /// offsets on both architectures. Only the fields needed for disk usage are
-/// declared; the remainder of the 120-byte struct is covered by `_pad`.
+/// declared; the remainder of the 120-byte struct is covered by `spare`.
 #[repr(C)]
 #[cfg(not(any(
   target_os = "macos",
@@ -406,13 +406,32 @@ pub struct StatfsBuf {
   pub f_frsize:  i64,
   pub f_flags:   i64,
 
-  #[allow(clippy::pub_underscore_fields, reason = "This is not a public API")]
-  pub _pad: [i64; 4],
+  pub spare: [i64; 4],
+}
+
+#[cfg(not(any(
+  target_os = "macos",
+  target_arch = "s390x",
+  target_arch = "arm",
+  target_arch = "riscv32",
+  target_arch = "x86",
+  target_arch = "powerpc",
+  target_arch = "sparc",
+  target_arch = "mips64",
+  target_arch = "mips"
+)))]
+impl StatfsBuf {
+  #[must_use = "this only reads a field"]
+  pub const fn block_size(&self) -> u64 {
+    self.f_bsize.unsigned_abs()
+  }
 }
 
 /// macOS `struct statfs` (the 64-bit/`INODE64` ABI, which is the only one on
-/// arm64). Only `f_bsize`, `f_blocks`, and `f_bavail` are read; the rest is
-/// declared to give the struct its correct size and field offsets.
+/// arm64).
+///
+/// Only `f_bsize`, `f_blocks`, and `f_bavail` are read; the rest is declared
+/// to give the struct its correct size and field offsets.
 #[repr(C)]
 #[cfg(target_os = "macos")]
 pub struct StatfsBuf {
@@ -435,6 +454,14 @@ pub struct StatfsBuf {
   pub f_reserved:    [u32; 7],
 }
 
+#[cfg(target_os = "macos")]
+impl StatfsBuf {
+  #[must_use = "this only reads a field"]
+  pub fn block_size(&self) -> u64 {
+    u64::from(self.f_bsize)
+  }
+}
+
 /// on s390x `f_type` and `f_bsize` are 32-bit.
 #[repr(C)]
 #[cfg(target_arch = "s390x")]
@@ -451,8 +478,15 @@ pub struct StatfsBuf {
   pub f_frsize:  u32,
   pub f_flags:   u32,
 
-  #[allow(clippy::pub_underscore_fields, reason = "This is not a public API")]
-  pub _pad: [u32; 5],
+  pub spare: [u32; 5],
+}
+
+#[cfg(target_arch = "s390x")]
+impl StatfsBuf {
+  #[must_use = "this only reads a field"]
+  pub fn block_size(&self) -> u64 {
+    u64::from(self.f_bsize)
+  }
 }
 
 /// on armv7 `statfs64(2)` has 32-bit word fields; see
@@ -478,8 +512,21 @@ pub struct StatfsBuf {
   pub f_frsize:  u32,
   pub f_flags:   u32,
 
-  #[allow(clippy::pub_underscore_fields, reason = "This is not a public API")]
-  pub _pad: [u32; 4],
+  pub spare: [u32; 4],
+}
+
+#[cfg(any(
+  target_arch = "arm",
+  target_arch = "riscv32",
+  target_arch = "x86",
+  target_arch = "powerpc",
+  target_arch = "sparc"
+))]
+impl StatfsBuf {
+  #[must_use = "this only reads a field"]
+  pub fn block_size(&self) -> u64 {
+    u64::from(self.f_bsize)
+  }
 }
 
 /// mips (O32) uses `compat_statfs64`, same reordering with 32-bit words; see
@@ -500,8 +547,15 @@ pub struct StatfsBuf {
   pub f_namelen: u32,
   pub f_flags:   u32,
 
-  #[allow(clippy::pub_underscore_fields, reason = "This is not a public API")]
-  pub _pad2: [u32; 5],
+  pub spare: [u32; 5],
+}
+
+#[cfg(target_arch = "mips")]
+impl StatfsBuf {
+  #[must_use = "this only reads a field"]
+  pub fn block_size(&self) -> u64 {
+    u64::from(self.f_bsize)
+  }
 }
 
 /// mips reorders fields; see
@@ -521,8 +575,15 @@ pub struct StatfsBuf {
   pub f_namelen: i64,
   pub f_flags:   i64,
 
-  #[allow(clippy::pub_underscore_fields, reason = "This is not a public API")]
-  pub _pad: [i64; 5],
+  pub spare: [i64; 5],
+}
+
+#[cfg(target_arch = "mips64")]
+impl StatfsBuf {
+  #[must_use = "this only reads a field"]
+  pub const fn block_size(&self) -> u64 {
+    self.f_bsize.unsigned_abs()
+  }
 }
 
 /// Direct `statfs(2)` syscall.
@@ -590,6 +651,7 @@ pub fn read_file_fast(path: &str, buffer: &mut [u8]) -> Result<usize, i32> {
 /// `mem_unit` ends at offset 108, then 4 bytes of implicit padding to 112.
 #[repr(C)]
 #[cfg(not(any(
+  target_os = "macos",
   target_arch = "arm",
   target_arch = "riscv32",
   target_arch = "x86",
@@ -642,8 +704,7 @@ pub struct SysInfo {
   pub totalhigh: u32,
   pub freehigh:  u32,
   pub mem_unit:  u32,
-  #[allow(clippy::pub_underscore_fields, reason = "This is not a public API")]
-  pub _f:        [u8; 8],
+  pub spare:     [u8; 8],
 }
 
 /// Direct `sysinfo(2)` syscall.
@@ -655,6 +716,7 @@ pub struct SysInfo {
 /// # Safety
 ///
 /// The caller must ensure that `info` points to a valid `SysInfo` buffer.
+#[cfg(not(target_os = "macos"))]
 #[inline]
 pub unsafe fn sys_sysinfo(info: *mut SysInfo) -> i64 {
   unsafe { arch::sys_sysinfo(info) }
@@ -671,6 +733,7 @@ pub unsafe fn sys_sysinfo(info: *mut SysInfo) -> i64 {
 ///
 /// The caller must ensure that `mask` points to a buffer of at least
 /// `mask_size` bytes.
+#[cfg(not(target_os = "macos"))]
 #[inline]
 pub unsafe fn sys_sched_getaffinity(
   pid: i32,

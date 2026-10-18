@@ -1,8 +1,9 @@
 //! macOS does not support a stable raw-syscall ABI the way Linux does, cannot
 //! be linked statically, and exposes none of the `/proc`, `/sys`, or
-//! `/etc/os-release` interfaces the Linux path relies on. So instead of
-//! handwritten `svc #0` traps, this module calls into `libSystem` (which is
-//! always linked on macOS) via plain FFI:
+//! `/etc/os-release` interfaces the Linux path relies on.
+//!
+//! So instead of handwritten `svc #0` traps, this module calls into `libSystem`
+//! (which is always linked on macOS) via plain FFI:
 //!
 //!   * file/IO + exit  -> `open`/`read`/`write`/`close`/`_exit`
 //!   * `uname(3)`       -> kernel name/release/machine
@@ -19,7 +20,7 @@ use core::{
   ptr,
 };
 
-use super::{StatfsBuf, SysInfo, UtsNameBuf};
+use super::{StatfsBuf, UtsNameBuf};
 
 #[link(name = "System", kind = "dylib")]
 unsafe extern "C" {
@@ -81,31 +82,6 @@ pub(crate) unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
 
 pub(crate) unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
   unsafe { statfs(path.cast::<c_char>(), buf) }
-}
-
-/// macOS has no `sysinfo(2)`; uptime comes from [`macos_uptime_secs`] instead.
-/// This stub exists only so the generic wrapper in `lib.rs` keeps compiling.
-#[allow(
-  clippy::missing_const_for_fn,
-  reason = "keeps the signature of the syscall it stands in for"
-)]
-pub(crate) unsafe fn sys_sysinfo(_info: *mut SysInfo) -> i64 {
-  -1
-}
-
-/// macOS has no `sched_getaffinity(2)`; core counts come from `sysctl`
-/// (`hw.logicalcpu` / `hw.physicalcpu`). This stub keeps the generic wrapper
-/// compiling.
-#[allow(
-  clippy::missing_const_for_fn,
-  reason = "keeps the signature of the syscall it stands in for"
-)]
-pub(crate) unsafe fn sys_sched_getaffinity(
-  _pid: i32,
-  _mask_size: usize,
-  _mask: *mut u8,
-) -> i32 {
-  -1
 }
 
 pub(crate) unsafe fn sys_exit(code: i32) -> ! {
@@ -175,7 +151,6 @@ const HOST_VM_INFO64: c_int = 4;
 /// `host_statistics64` matches the kernel's expectation exactly (38 ints).
 #[repr(C)]
 #[derive(Default)]
-#[allow(dead_code, reason = "most fields exist only to fix the struct layout")]
 struct VmStatistics64 {
   free_count:                             u32,
   active_count:                           u32,
@@ -241,7 +216,6 @@ pub fn macos_meminfo() -> Option<(u64, u64)> {
 /// `struct timeval` (`time_t` is 64-bit, `suseconds_t` is 32-bit on macOS).
 #[repr(C)]
 #[derive(Default)]
-#[allow(dead_code, reason = "tv_usec/_pad exist only to fix the struct layout")]
 struct Timeval {
   tv_sec:  i64,
   tv_usec: i32,
