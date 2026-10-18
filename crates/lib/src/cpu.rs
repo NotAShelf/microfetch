@@ -351,37 +351,181 @@ fn write_model_name(w: &mut StackWriter) {
   };
   let data = &buf[..n];
 
-  let name = extract_name(data);
-  if name.is_none() && !write_dt_compatible(w) {
-    return;
-  }
-
   let mhz = get_cpu_freq_mhz(data);
-  if let Some(name) = name {
-    // x86 `model name` already ends in `@ <clock>GHz`, which hides the
-    // ` CPU` that trim() would otherwise strip, so re-trim after cutting.
-    let name = match (mhz, name.find(" @ ")) {
-      (Some(_), Some(at)) => trim(&name[..at]),
-      _ => name,
-    };
-    w.push_str(name);
+  let named = match extract_name(data) {
+    Some(name) => {
+      // x86 `model name` already ends in `@ <clock>GHz`, which hides the
+      // ` CPU` that trim() would otherwise strip, so re-trim after cutting.
+      let name = match (mhz, name.find(" @ ")) {
+        (Some(_), Some(at)) => trim(&name[..at]),
+        _ => name,
+      };
+      w.push_str(name);
+      true
+    },
+    None => {
+      write_dt_compatible(w)
+        || (cfg!(target_arch = "aarch64") && write_arm_part(w, data))
+    },
+  };
+
+  let Some(mhz) = mhz else {
+    return;
+  };
+
+  if named {
+    w.push_str(" @ ");
   }
 
-  if let Some(mhz) = mhz {
-    w.push_str(" @ ");
-    // Round to nearest 0.01 GHz, then split so carries (e.g. 1999 MHz)
-    // roll into the integer part instead of overflowing the fraction.
-    let rounded_centesimal = (mhz + 5) / 10;
-    let ghz_int = rounded_centesimal / 100;
-    let ghz_frac = rounded_centesimal % 100;
-    w.push_u64(u64::from(ghz_int));
-    w.push_byte(b'.');
-    if ghz_frac < 10 {
-      w.push_byte(b'0');
-    }
-    w.push_u64(u64::from(ghz_frac));
-    w.push_str(" GHz");
+  // Round to nearest 0.01 GHz, then split so carries (e.g. 1999 MHz)
+  // roll into the integer part instead of overflowing the fraction.
+  let rounded_centesimal = (mhz + 5) / 10;
+  let ghz_int = rounded_centesimal / 100;
+  let ghz_frac = rounded_centesimal % 100;
+  w.push_u64(u64::from(ghz_int));
+  w.push_byte(b'.');
+  if ghz_frac < 10 {
+    w.push_byte(b'0');
   }
+  w.push_u64(u64::from(ghz_frac));
+  w.push_str(" GHz");
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Clone, Copy)]
+enum ArmFamily {
+  Cortex,
+  Neoverse,
+  C1,
+  Ampere,
+}
+
+#[cfg(target_os = "linux")]
+impl ArmFamily {
+  const fn implementer(self) -> u32 {
+    match self {
+      Self::Cortex | Self::Neoverse | Self::C1 => 0x41,
+      Self::Ampere => 0xC0,
+    }
+  }
+
+  const fn prefix(self) -> &'static str {
+    match self {
+      Self::Cortex => "Cortex-",
+      Self::Neoverse => "Neoverse-",
+      Self::C1 => "C1-",
+      Self::Ampere => "Ampere-",
+    }
+  }
+}
+
+#[cfg(target_os = "linux")]
+struct ArmPart {
+  part:   u16,
+  family: ArmFamily,
+  model:  [u8; 7],
+}
+
+#[cfg(target_os = "linux")]
+const fn arm_part(part: u16, family: ArmFamily, model: &str) -> ArmPart {
+  let bytes = model.as_bytes();
+  let mut padded = [0u8; 7];
+  let mut index = 0;
+  while index < bytes.len() {
+    padded[index] = bytes[index];
+    index += 1;
+  }
+  ArmPart {
+    part,
+    family,
+    model: padded,
+  }
+}
+
+/// Fixed-width names keep the table pointer-free :)
+#[cfg(target_os = "linux")]
+static ARM_PARTS: [ArmPart; 45] = {
+  use ArmFamily::{Ampere, C1, Cortex, Neoverse};
+  [
+    arm_part(0xD02, Cortex, "A34"),
+    arm_part(0xD03, Cortex, "A53"),
+    arm_part(0xD04, Cortex, "A35"),
+    arm_part(0xD05, Cortex, "A55"),
+    arm_part(0xD06, Cortex, "A65"),
+    arm_part(0xD07, Cortex, "A57"),
+    arm_part(0xD08, Cortex, "A72"),
+    arm_part(0xD09, Cortex, "A73"),
+    arm_part(0xD0A, Cortex, "A75"),
+    arm_part(0xD0B, Cortex, "A76"),
+    arm_part(0xD0C, Neoverse, "N1"),
+    arm_part(0xD0D, Cortex, "A77"),
+    arm_part(0xD0E, Cortex, "A76AE"),
+    arm_part(0xD40, Neoverse, "V1"),
+    arm_part(0xD41, Cortex, "A78"),
+    arm_part(0xD42, Cortex, "A78AE"),
+    arm_part(0xD43, Cortex, "A65AE"),
+    arm_part(0xD44, Cortex, "X1"),
+    arm_part(0xD46, Cortex, "A510"),
+    arm_part(0xD47, Cortex, "A710"),
+    arm_part(0xD48, Cortex, "X2"),
+    arm_part(0xD49, Neoverse, "N2"),
+    arm_part(0xD4A, Neoverse, "E1"),
+    arm_part(0xD4B, Cortex, "A78C"),
+    arm_part(0xD4C, Cortex, "X1C"),
+    arm_part(0xD4D, Cortex, "A715"),
+    arm_part(0xD4E, Cortex, "X3"),
+    arm_part(0xD4F, Neoverse, "V2"),
+    arm_part(0xD80, Cortex, "A520"),
+    arm_part(0xD81, Cortex, "A720"),
+    arm_part(0xD82, Cortex, "X4"),
+    arm_part(0xD83, Neoverse, "V3AE"),
+    arm_part(0xD84, Neoverse, "V3"),
+    arm_part(0xD85, Cortex, "X925"),
+    arm_part(0xD87, Cortex, "A725"),
+    arm_part(0xD88, Cortex, "A520AE"),
+    arm_part(0xD89, Cortex, "A720AE"),
+    arm_part(0xD8A, C1, "Nano"),
+    arm_part(0xD8B, C1, "Pro"),
+    arm_part(0xD8C, C1, "Ultra"),
+    arm_part(0xD8E, Neoverse, "N3"),
+    arm_part(0xD8F, Cortex, "A320"),
+    arm_part(0xD90, C1, "Premium"),
+    arm_part(0xAC3, Ampere, "1"),
+    arm_part(0xAC4, Ampere, "1a"),
+  ]
+};
+
+/// Name the core from `CPU implementer` and `CPU part` on ACPI aarch64.
+#[cfg(target_os = "linux")]
+fn write_arm_part(w: &mut StackWriter, data: &[u8]) -> bool {
+  let hex = |key| {
+    let digits = extract_field(data, key)?.strip_prefix("0x")?;
+    let mut value = 0u32;
+    for digit in digits
+      .bytes()
+      .map_while(|byte| char::from(byte).to_digit(16))
+    {
+      value = value << 4 | digit;
+    }
+    Some(value)
+  };
+
+  let (Some(implementer), Some(part)) =
+    (hex(b"CPU implementer"), hex(b"CPU part"))
+  else {
+    return false;
+  };
+
+  let Some(entry) = ARM_PARTS.iter().find(|entry| {
+    u32::from(entry.part) == part && entry.family.implementer() == implementer
+  }) else {
+    return false;
+  };
+
+  let len = entry.model.iter().position(|&b| b == 0).unwrap_or(7);
+  w.push_str(entry.family.prefix());
+  w.push_bytes(&entry.model[..len]);
+  true
 }
 
 /// Extract a human-readable CPU name from cpuinfo fields.
