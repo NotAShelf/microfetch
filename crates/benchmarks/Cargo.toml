@@ -8,10 +8,9 @@ license.workspace      = true
 publish                = false
 
 [dependencies]
-criterion.workspace                 = true
-criterion-cycles-per-byte.workspace = true
-hotpath                             = { optional = true, version = "0.28.3" }
-microfetch-lib.workspace            = true
+criterion.workspace      = true
+hotpath                  = { optional = true, version = "0.28.3" }
+microfetch-lib.workspace = true
 
 [features]
 hotpath       = [ "dep:hotpath", "hotpath/hotpath", "microfetch-lib/hotpath" ]

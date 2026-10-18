@@ -12,8 +12,7 @@ version      = "1.2.0"
 microfetch-asm = { path = "./crates/asm", version = "1.2.0" }
 microfetch-lib = { path = "./crates/lib", version = "1.2.0" }
 
-criterion                 = { default-features = false, features = [ "cargo_bench_support" ], version = "0.8.2" }
-criterion-cycles-per-byte = "0.8.0"
+criterion = { default-features = false, features = [ "cargo_bench_support" ], version = "0.8.2" }
 
 [workspace.lints.clippy]
 complexity = { level = "warn", priority = -1 }
