@@ -267,7 +267,20 @@ const CUSTOM_LOGO: &str = match option_env!("MICROFETCH_LOGO") {
 };
 
 /// Packed logo rows. `0` separates rows; `1` and `2` select colors.
-const LOGO: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/logo.bin"));
+const LOGO: &[u8] = concat!(
+  "\x01⠀⠀⠀⠀⠀⠀⢼⣿⣄⠀⠀⠀\x02⠹⣿⣷⡀⠀⣠⣿⡧⠀⠀⠀⠀⠀⠀\0",
+  "\x01⠀⠀⠀⠀⠀⠀⠈⢿⣿⣆⠀⠀⠀\x02⠘⣿⣿⣴⣿⡿⠁⠀⠀⠀⠀⠀⠀\0",
+  "\x01⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡜\x02⢿⣿⣟⠀⠀⠀\x01⢀⡄⠀⠀⠀\0",
+  "\x01⠀⠀⠀⠉⠉⠉⠉\x02⣩⣭⡭\x01⠉⠉⠉⠉⠉\x02⠈⢿⣿⣆⠀\x01⢠⣿⣿⠂⠀⠀\0",
+  "\x02⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀⠀⠀⢻⡟\x01⣡⣿⣿⠃⠀⠀⠀\0",
+  "\x02⢸⣿⣿⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\x01⣰⣿⣿⣿⣿⣿⣿⡇\0",
+  "\x02⠀⠀⠀⢠⣿⣿⢋\x01⣼⣧⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀\0",
+  "\x02⠀⠀⠠⣿⣿⠃⠀\x01⠹⣿⣷⡀\x02⣀⣀⣀⣀⣀\x01⣚⣛⣋\x02⣀⣀⣀⣀⠀⠀⠀\0",
+  "\x02⠀⠀⠀⠘⠁⠀⠀⠀\x01⣽⣿⣷⡜\x02⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀\0",
+  "\x01⠀⠀⠀⠀⠀⠀⢀⣾⣿⠟⣿⣿⡄⠀⠀⠀\x02⠹⣿⣷⡀⠀⠀⠀⠀⠀⠀\0",
+  "\x01⠀⠀⠀⠀⠀⠀⢺⣿⠋⠀⠈⢿⣿⣆⠀⠀⠀\x02⠙⣿⡗⠀⠀⠀⠀⠀⠀",
+)
+.as_bytes();
 
 /// Write one row from a packed color-marked byte stream.
 #[inline(never)]
