@@ -239,7 +239,7 @@ You can't\*
 
 ### Really?
 
-[main module]: ../microfetch/src/main.rs
+[main module]: ../src/main.rs
 [discussions tab]: https://github.com/NotAShelf/microfetch/discussions
 
 To be fair, you _can_ customize Microfetch by, well, patching it. It is
