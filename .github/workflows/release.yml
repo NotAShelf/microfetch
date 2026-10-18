@@ -1,0 +1,68 @@
+name: Tag and Release
+
+on:
+  workflow_dispatch:
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    permissions:
+      contents: write
+      id-token: write
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    uses: manic-systems/workflows/.github/workflows/rust-release.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    with:
+      stage: prepare
+
+  build:
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    needs: prepare
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.skip != 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, suffix: linux-amd64 }
+          - { os: ubuntu-26.04-arm, suffix: linux-arm64 }
+          - { os: macos-latest, suffix: darwin-arm64 }
+    uses: manic-systems/workflows/.github/workflows/rust-build.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    with:
+      upload: true
+      version: ${{ needs.prepare.outputs.version }}
+      os: ${{ matrix.os }}
+      suffix: ${{ matrix.suffix }}
+
+  finalize:
+    permissions:
+      contents: write
+      id-token: write
+    needs: [prepare, build]
+    if: ${{ needs.prepare.outputs.skip != 'true' && needs.build.result == 'success' }}
+    uses: manic-systems/workflows/.github/workflows/rust-release.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    with:
+      stage: finalize
+      version: ${{ needs.prepare.outputs.version }}
+
+  publish:
+    permissions:
+      contents: write
+      id-token: write
+    needs: [prepare, finalize]
+    if: ${{ needs.prepare.outputs.skip != 'true' && needs.finalize.result == 'success' }}
+    uses: manic-systems/workflows/.github/workflows/rust-release.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    with:
+      stage: publish
+      version: ${{ needs.prepare.outputs.version }}
+      publish-command: nix develop --command cargo publish --locked --workspace
