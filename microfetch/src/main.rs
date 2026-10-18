@@ -9,12 +9,20 @@
   ),
   feature(asm_experimental_arch)
 )]
-#![cfg_attr(nightly, feature(lang_items))]
+#![cfg_attr(
+  nightly,
+  feature(lang_items),
+  expect(
+    internal_features,
+    reason = "only the lang item can name the personality routine"
+  )
+)]
 
-#[cfg(not(target_os = "macos"))] use core::arch::naked_asm;
+#[cfg(not(any(target_os = "macos", target_abi = "elfv1")))]
+use core::arch::naked_asm;
 
 // The custom `_start` (and the `entry_rust` it calls) is Linux-only.
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_abi = "elfv1")))]
 use microfetch_asm::entry_rust;
 use microfetch_asm::sys_write;
 // Re-export libc replacement functions from asm crate. On macOS these are
@@ -319,13 +327,12 @@ pub unsafe extern "C" fn main(argc: i32, argv: *const *const u8) -> i32 {
   }
 
   // Run the main application logic
-  match unsafe { microfetch_lib::run(argc, argv) } {
-    Ok(()) => 0,
-    Err(_) => {
-      const ERR_MSG: &[u8] = b"Error\n";
-      let _ = unsafe { sys_write(2, ERR_MSG.as_ptr(), ERR_MSG.len()) };
-      1
-    },
+  if unsafe { microfetch_lib::run(argc, argv) }.is_ok() {
+    0
+  } else {
+    const ERR_MSG: &[u8] = b"Error\n";
+    let _ = unsafe { sys_write(2, ERR_MSG.as_ptr(), ERR_MSG.len()) };
+    1
   }
 }
 

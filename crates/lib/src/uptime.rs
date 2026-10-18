@@ -28,12 +28,11 @@ pub fn write_uptime(w: &mut StackWriter) -> Result<(), Error> {
   let days = uptime_seconds / 86400;
   let hours = (uptime_seconds / 3600) % 24;
   let minutes = (uptime_seconds / 60) % 60;
-  let mut any = false;
+  let mut any = days > 0;
 
-  if days > 0 {
+  if any {
     w.push_u64(days);
     w.push_str(if days == 1 { " day" } else { " days" });
-    any = true;
   }
   if hours > 0 {
     if any {
