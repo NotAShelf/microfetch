@@ -6,13 +6,13 @@
 min_percent_total = 2
 
 [functions.alloc]
-judged = true
+judged             = true
+metrics            = [ "avg", "total" ]
+min_calls          = 1
 min_percent_change = 20
-metrics = ["avg", "total"]
-min_calls = 1
 
 [functions.timing]
-judged = false
+judged             = false
+metrics            = [ "avg", "total" ]
+min_calls          = 1
 min_percent_change = 50
-metrics = ["avg", "total"]
-min_calls = 1

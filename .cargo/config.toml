@@ -5,12 +5,12 @@
 # so they only affect the final binary and don't break proc-macro or build-script linking.
 [target.'cfg(target_os = "linux")']
 # Suppress .eh_frame emission from our own codegen.
-rustflags = ["-C", "force-unwind-tables=no"]
+rustflags = [ "-C", "force-unwind-tables=no" ]
 
 [target.x86_64-unknown-linux-gnu]
-linker = "scripts/clang-wild"
-rustflags = ["-C", "force-unwind-tables=no"]
+linker    = "scripts/clang-wild"
+rustflags = [ "-C", "force-unwind-tables=no" ]
 
 [target.aarch64-unknown-linux-gnu]
-linker = "scripts/clang-wild"
-rustflags = ["-C", "force-unwind-tables=no"]
+linker    = "scripts/clang-wild"
+rustflags = [ "-C", "force-unwind-tables=no" ]
