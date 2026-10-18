@@ -1,4 +1,4 @@
-use std::{hint::black_box, mem::MaybeUninit};
+use core::{hint::black_box, mem::MaybeUninit};
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use microfetch_lib::{
