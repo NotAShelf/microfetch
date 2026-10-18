@@ -224,7 +224,8 @@ pub fn macos_meminfo() -> Option<(u64, u64)> {
   let page = u64::from(macos_sysctl_u32(b"hw.pagesize\0").unwrap_or(16384));
 
   let mut vm = VmStatistics64::default();
-  let mut count = (size_of::<VmStatistics64>() / size_of::<i32>()) as u32;
+  let mut count =
+    u32::try_from(size_of::<VmStatistics64>() / size_of::<i32>()).ok()?;
   let kr = unsafe {
     host_statistics64(
       mach_host_self(),
@@ -267,7 +268,7 @@ pub fn macos_uptime_secs() -> Option<u64> {
   let ret = unsafe {
     sysctl(
       mib.as_ptr(),
-      mib.len() as u32,
+      u32::try_from(mib.len()).ok()?,
       ptr::from_mut(&mut boot).cast::<c_void>(),
       &raw mut len,
       ptr::null(),

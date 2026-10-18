@@ -293,7 +293,7 @@ fn write_styled_row(
   let mut i = 0;
   while i < row_data.len() {
     if let marker @ 1..=3 = row_data[i] {
-      w.push_str(colors[(marker - 1) as usize]);
+      w.push_str(colors[usize::from(marker - 1)]);
       i += 1;
     } else {
       let chunk_start = i;
@@ -461,13 +461,13 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
   // Single syscall for the entire output.
   let out = w.written();
   let written = unsafe { sys_write(1, out.as_ptr(), out.len()) };
-  if written < 0 {
-    #[allow(clippy::cast_possible_truncation)]
-    return Err(Error::OsError(written as i32));
-  }
+  let Ok(count) = usize::try_from(written) else {
+    return Err(
+      i32::try_from(written).map_or(Error::WriteError, Error::OsError),
+    );
+  };
 
-  #[allow(clippy::cast_sign_loss)]
-  if written as usize != out.len() {
+  if count != out.len() {
     return Err(Error::WriteError);
   }
 

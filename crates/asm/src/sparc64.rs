@@ -4,7 +4,7 @@ use super::{StatfsBuf, SysInfo, UtsNameBuf};
 
 pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe {
-    let ret: i64;
+    let ret: i32;
     core::arch::asm!(
       "mov {nr}, %g1",
       "t 0x6d",
@@ -12,21 +12,19 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
       "sub %g0, %o0, %o0",
       "1:",
       nr = in(reg) 5i64,  // SYS_open
-      inlateout("o0") path => ret,
+      in("o0") path,
+      lateout("o0") ret,
       in("o1") flags,
       in("o2") 0i32,  // mode
       options(nostack)
     );
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      ret as i32
-    }
+    ret
   }
 }
 
 pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
   unsafe {
-    let ret: i64;
+    let ret: isize;
     core::arch::asm!(
       "mov {nr}, %g1",
       "t 0x6d",
@@ -34,18 +32,19 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
       "sub %g0, %o0, %o0",
       "1:",
       nr = in(reg) 3i64,  // SYS_read
-      inlateout("o0") fd as i64 => ret,
+      in("o0") i64::from(fd),
+      lateout("o0") ret,
       in("o1") buf,
       in("o2") count,
       options(nostack)
     );
-    ret as isize
+    ret
   }
 }
 
 pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
   unsafe {
-    let ret: i64;
+    let ret: isize;
     core::arch::asm!(
       "mov {nr}, %g1",
       "t 0x6d",
@@ -53,18 +52,19 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
       "sub %g0, %o0, %o0",
       "1:",
       nr = in(reg) 4i64,  // SYS_write
-      inlateout("o0") fd as i64 => ret,
+      in("o0") i64::from(fd),
+      lateout("o0") ret,
       in("o1") buf,
       in("o2") count,
       options(nostack)
     );
-    ret as isize
+    ret
   }
 }
 
 pub unsafe fn sys_close(fd: i32) -> i32 {
   unsafe {
-    let ret: i64;
+    let ret: i32;
     core::arch::asm!(
       "mov {nr}, %g1",
       "t 0x6d",
@@ -72,19 +72,17 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
       "sub %g0, %o0, %o0",
       "1:",
       nr = in(reg) 6i64,  // SYS_close
-      inlateout("o0") fd as i64 => ret,
+      in("o0") i64::from(fd),
+      lateout("o0") ret,
       options(nostack)
     );
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      ret as i32
-    }
+    ret
   }
 }
 
 pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
   unsafe {
-    let ret: i64;
+    let ret: i32;
     core::arch::asm!(
       "mov {nr}, %g1",
       "t 0x6d",
@@ -92,19 +90,17 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
       "sub %g0, %o0, %o0",
       "1:",
       nr = in(reg) 189i64,  // SYS_newuname
-      inlateout("o0") buf => ret,
+      in("o0") buf,
+      lateout("o0") ret,
       options(nostack)
     );
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      ret as i32
-    }
+    ret
   }
 }
 
 pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
   unsafe {
-    let ret: i64;
+    let ret: i32;
     core::arch::asm!(
       "mov {nr}, %g1",
       "t 0x6d",
@@ -112,14 +108,12 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
       "sub %g0, %o0, %o0",
       "1:",
       nr = in(reg) 157i64,  // SYS_statfs
-      inlateout("o0") path => ret,
+      in("o0") path,
+      lateout("o0") ret,
       in("o1") buf,
       options(nostack)
     );
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      ret as i32
-    }
+    ret
   }
 }
 
@@ -133,7 +127,8 @@ pub unsafe fn sys_sysinfo(info: *mut SysInfo) -> i64 {
       "sub %g0, %o0, %o0",
       "1:",
       nr = in(reg) 214_i64, // __NR_sysinfo
-      inlateout("o0") info => ret,
+      in("o0") info,
+      lateout("o0") ret,
       options(nostack)
     );
     ret
@@ -146,7 +141,7 @@ pub unsafe fn sys_sched_getaffinity(
   mask: *mut u8,
 ) -> i32 {
   unsafe {
-    let ret: i64;
+    let ret: i32;
     core::arch::asm!(
       "mov {nr}, %g1",
       "t 0x6d",
@@ -154,15 +149,13 @@ pub unsafe fn sys_sched_getaffinity(
       "sub %g0, %o0, %o0",
       "1:",
       nr = in(reg) 260i64,  // __NR_sched_getaffinity
-      inlateout("o0") pid as i64 => ret,
+      in("o0") i64::from(pid),
+      lateout("o0") ret,
       in("o1") mask_size,
       in("o2") mask,
       options(nostack)
     );
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      ret as i32
-    }
+    ret
   }
 }
 

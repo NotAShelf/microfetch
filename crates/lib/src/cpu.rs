@@ -100,12 +100,7 @@ fn get_thread_count() -> Option<u32> {
   let ret = unsafe {
     crate::syscall::sys_sched_getaffinity(0, mask.len(), mask.as_mut_ptr())
   };
-  if ret < 0 {
-    return None;
-  }
-
-  #[allow(clippy::cast_sign_loss)]
-  let bytes = ret as usize;
+  let bytes = usize::try_from(ret).ok()?;
   let mut count = 0u32;
   for &byte in &mask[..bytes] {
     count += byte.count_ones();
@@ -328,8 +323,7 @@ fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
       }
     }
     if hz > 0 {
-      #[allow(clippy::cast_possible_truncation)]
-      return Some((hz / 1_000_000) as u32);
+      return u32::try_from(hz / 1_000_000).ok();
     }
   }
   None

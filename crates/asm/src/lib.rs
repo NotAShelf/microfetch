@@ -97,8 +97,8 @@ pub unsafe extern "C" fn memcpy(
         dest_bytes.add(i).cast::<usize>().write_unaligned(word);
         i += WORD;
       }
-    } else if dest_bytes as usize % WORD == src_bytes as usize % WORD {
-      while i < n && !(dest_bytes.add(i) as usize).is_multiple_of(WORD) {
+    } else if dest_bytes.addr() % WORD == src_bytes.addr() % WORD {
+      while i < n && !dest_bytes.add(i).addr().is_multiple_of(WORD) {
         *dest_bytes.add(i) = *src_bytes.add(i);
         i += 1;
       }
@@ -140,7 +140,7 @@ pub unsafe extern "C" fn memset(
         i += WORD;
       }
     } else {
-      while i < n && !(bytes.add(i) as usize).is_multiple_of(WORD) {
+      while i < n && !bytes.add(i).addr().is_multiple_of(WORD) {
         *bytes.add(i) = value;
         i += 1;
       }
@@ -574,15 +574,8 @@ pub fn read_file_fast(path: &str, buffer: &mut [u8]) -> Result<usize, i32> {
     let bytes_read = sys_read(fd, buffer.as_mut_ptr(), buffer.len());
     let _ = sys_close(fd);
 
-    if bytes_read < 0 {
-      #[allow(clippy::cast_possible_truncation)]
-      return Err(bytes_read as i32);
-    }
-
-    #[allow(clippy::cast_sign_loss)]
-    {
-      Ok(bytes_read as usize)
-    }
+    usize::try_from(bytes_read)
+      .map_err(|_| i32::try_from(bytes_read).unwrap_or(i32::MIN))
   }
 }
 
