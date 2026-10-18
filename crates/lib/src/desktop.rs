@@ -1,7 +1,7 @@
 use crate::{StackWriter, getenv_str};
 
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_desktop_info(w: &mut StackWriter) {
+pub fn write_desktop_info(writer: &mut StackWriter) {
   let desktop_raw = getenv_str("XDG_CURRENT_DESKTOP");
   let session_raw = getenv_str("XDG_SESSION_TYPE");
 
@@ -13,7 +13,7 @@ pub fn write_desktop_info(w: &mut StackWriter) {
         "Unknown"
       }
     },
-    |s| s.strip_prefix("none+").unwrap_or(s),
+    |desktop| desktop.strip_prefix("none+").unwrap_or(desktop),
   );
 
   let backend_str = session_raw.unwrap_or({
@@ -24,8 +24,8 @@ pub fn write_desktop_info(w: &mut StackWriter) {
     }
   });
 
-  w.push_str(desktop_str);
-  w.push_str(" (");
+  writer.push_str(desktop_str);
+  writer.push_str(" (");
 
   // Capitalize first character of backend
   if let Some(&first_byte) = backend_str.as_bytes().first() {
@@ -35,9 +35,9 @@ pub fn write_desktop_info(w: &mut StackWriter) {
     } else {
       first_byte
     };
-    w.push_byte(upper);
-    w.push_str(&backend_str[1..]);
+    writer.push_byte(upper);
+    writer.push_str(&backend_str[1..]);
   }
 
-  w.push_byte(b')');
+  writer.push_byte(b')');
 }

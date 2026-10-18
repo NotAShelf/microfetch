@@ -12,96 +12,96 @@ use microfetch_lib::{
   uptime,
 };
 
-fn main_benchmark(c: &mut Criterion) {
+fn main_benchmark(criterion: &mut Criterion) {
   let utsname = UtsName::uname().expect("Failed to get uname");
   let colors = Colors::new(false);
 
-  c.bench_function("user_info", |b| {
-    b.iter(|| {
+  criterion.bench_function("user_info", |bencher| {
+    bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
-      let mut w = StackWriter::new(&mut buf);
-      system::write_username_and_hostname(&mut w, &colors, &utsname);
-      black_box(w.written());
+      let mut writer = StackWriter::new(&mut buf);
+      system::write_username_and_hostname(&mut writer, &colors, &utsname);
+      black_box(writer.written());
     });
   });
-  c.bench_function("os_name", |b| {
-    b.iter(|| {
+  criterion.bench_function("os_name", |bencher| {
+    bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
-      let mut w = StackWriter::new(&mut buf);
-      release::write_os_pretty_name(&mut w);
-      black_box(w.written());
+      let mut writer = StackWriter::new(&mut buf);
+      release::write_os_pretty_name(&mut writer);
+      black_box(writer.written());
     });
   });
-  c.bench_function("kernel_version", |b| {
-    b.iter(|| {
+  criterion.bench_function("kernel_version", |bencher| {
+    bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
-      let mut w = StackWriter::new(&mut buf);
-      release::write_system_info(&mut w, &utsname);
-      black_box(w.written());
+      let mut writer = StackWriter::new(&mut buf);
+      release::write_system_info(&mut writer, &utsname);
+      black_box(writer.written());
     });
   });
-  c.bench_function("cpu_name", |b| {
-    b.iter(|| {
+  criterion.bench_function("cpu_name", |bencher| {
+    bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
-      let mut w = StackWriter::new(&mut buf);
-      cpu::write_cpu_name(&mut w);
-      black_box(w.written());
+      let mut writer = StackWriter::new(&mut buf);
+      cpu::write_cpu_name(&mut writer);
+      black_box(writer.written());
     });
   });
-  c.bench_function("cpu_cores", |b| {
-    b.iter(|| {
+  criterion.bench_function("cpu_cores", |bencher| {
+    bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
-      let mut w = StackWriter::new(&mut buf);
-      cpu::write_cpu_cores(&mut w);
-      black_box(w.written());
+      let mut writer = StackWriter::new(&mut buf);
+      cpu::write_cpu_cores(&mut writer);
+      black_box(writer.written());
     });
   });
-  c.bench_function("shell", |b| {
-    b.iter(|| {
+  criterion.bench_function("shell", |bencher| {
+    bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
-      let mut w = StackWriter::new(&mut buf);
-      system::write_shell(&mut w);
-      black_box(w.written());
+      let mut writer = StackWriter::new(&mut buf);
+      system::write_shell(&mut writer);
+      black_box(writer.written());
     });
   });
-  c.bench_function("desktop", |b| {
-    b.iter(|| {
+  criterion.bench_function("desktop", |bencher| {
+    bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
-      let mut w = StackWriter::new(&mut buf);
-      desktop::write_desktop_info(&mut w);
-      black_box(w.written());
+      let mut writer = StackWriter::new(&mut buf);
+      desktop::write_desktop_info(&mut writer);
+      black_box(writer.written());
     });
   });
-  c.bench_function("uptime", |b| {
-    b.iter(|| {
+  criterion.bench_function("uptime", |bencher| {
+    bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
-      let mut w = StackWriter::new(&mut buf);
-      uptime::write_uptime(&mut w);
-      black_box(w.written());
+      let mut writer = StackWriter::new(&mut buf);
+      uptime::write_uptime(&mut writer);
+      black_box(writer.written());
     });
   });
-  c.bench_function("memory_usage", |b| {
-    b.iter(|| {
+  criterion.bench_function("memory_usage", |bencher| {
+    bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
-      let mut w = StackWriter::new(&mut buf);
-      system::write_memory_usage(&mut w, &colors);
-      black_box(w.written());
+      let mut writer = StackWriter::new(&mut buf);
+      system::write_memory_usage(&mut writer, &colors);
+      black_box(writer.written());
     });
   });
-  c.bench_function("storage", |b| {
-    b.iter(|| {
+  criterion.bench_function("storage", |bencher| {
+    bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
-      let mut w = StackWriter::new(&mut buf);
-      system::write_root_disk_usage(&mut w, &colors);
-      black_box(w.written());
+      let mut writer = StackWriter::new(&mut buf);
+      system::write_root_disk_usage(&mut writer, &colors);
+      black_box(writer.written());
     });
   });
-  c.bench_function("colors", |b| {
-    b.iter(|| {
+  criterion.bench_function("colors", |bencher| {
+    bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
-      let mut w = StackWriter::new(&mut buf);
-      colors::write_dots(&mut w, &colors);
-      black_box(w.written());
+      let mut writer = StackWriter::new(&mut buf);
+      colors::write_dots(&mut writer, &colors);
+      black_box(writer.written());
     });
   });
 }

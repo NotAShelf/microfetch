@@ -71,12 +71,12 @@ const UNALIGNED_WORDS: bool = cfg!(any(
   target_arch = "loongarch64",
 ));
 
-/// Copies `n` bytes from `src` to `dest`.
+/// Copies `len` bytes from `src` to `dest`.
 ///
 /// # Safety
 ///
 /// `dest` and `src` must be valid pointers to non-overlapping regions of
-/// memory of at least `n` bytes.
+/// memory of at least `len` bytes.
 // On macOS these symbols are supplied by libSystem; defining our own would
 // clash at link time, so the freestanding implementations are Linux-only.
 #[cfg(not(target_os = "macos"))]
@@ -85,31 +85,33 @@ const UNALIGNED_WORDS: bool = cfg!(any(
 pub unsafe extern "C" fn memcpy(
   dest: *mut c_void,
   src: *const c_void,
-  n: usize,
+  len: usize,
 ) -> *mut c_void {
   let dest_bytes = dest.cast::<u8>();
   let src_bytes = src.cast::<u8>();
-  let mut i = 0;
+  let mut offset = 0;
   unsafe {
     if UNALIGNED_WORDS {
-      while n - i >= WORD {
-        let word = src_bytes.add(i).cast::<usize>().read_unaligned();
-        dest_bytes.add(i).cast::<usize>().write_unaligned(word);
-        i += WORD;
+      while len - offset >= WORD {
+        let word = src_bytes.add(offset).cast::<usize>().read_unaligned();
+        dest_bytes.add(offset).cast::<usize>().write_unaligned(word);
+        offset += WORD;
       }
     } else if dest_bytes.addr() % WORD == src_bytes.addr() % WORD {
-      while i < n && !dest_bytes.add(i).addr().is_multiple_of(WORD) {
-        *dest_bytes.add(i) = *src_bytes.add(i);
-        i += 1;
+      while offset < len && !dest_bytes.add(offset).addr().is_multiple_of(WORD)
+      {
+        *dest_bytes.add(offset) = *src_bytes.add(offset);
+        offset += 1;
       }
-      while n - i >= WORD {
-        *dest_bytes.add(i).cast::<usize>() = *src_bytes.add(i).cast::<usize>();
-        i += WORD;
+      while len - offset >= WORD {
+        *dest_bytes.add(offset).cast::<usize>() =
+          *src_bytes.add(offset).cast::<usize>();
+        offset += WORD;
       }
     }
-    while i < n {
-      *dest_bytes.add(i) = *src_bytes.add(i);
-      i += 1;
+    while offset < len {
+      *dest_bytes.add(offset) = *src_bytes.add(offset);
+      offset += 1;
     }
   }
   dest
@@ -119,64 +121,64 @@ pub unsafe extern "C" fn memcpy(
 ///
 /// # Safety
 ///
-/// `s` must be a valid pointer to memory of at least `n` bytes.
-/// The value in `c` is treated as unsigned (lower 8 bits used).
+/// `dest` must be a valid pointer to memory of at least `len` bytes.
+/// The value in `fill` is treated as unsigned (lower 8 bits used).
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
 #[allow(clippy::cast_ptr_alignment)]
 pub unsafe extern "C" fn memset(
-  s: *mut c_void,
-  c: i32,
-  n: usize,
+  dest: *mut c_void,
+  fill: i32,
+  len: usize,
 ) -> *mut c_void {
-  let bytes = s.cast::<u8>();
-  let value = c.to_le_bytes()[0];
-  let mut i = 0;
+  let bytes = dest.cast::<u8>();
+  let value = fill.to_le_bytes()[0];
+  let mut offset = 0;
   unsafe {
     if UNALIGNED_WORDS {
       let word = usize::from_ne_bytes([value; WORD]);
-      while n - i >= WORD {
-        bytes.add(i).cast::<usize>().write_unaligned(word);
-        i += WORD;
+      while len - offset >= WORD {
+        bytes.add(offset).cast::<usize>().write_unaligned(word);
+        offset += WORD;
       }
     } else {
-      while i < n && !bytes.add(i).addr().is_multiple_of(WORD) {
-        *bytes.add(i) = value;
-        i += 1;
+      while offset < len && !bytes.add(offset).addr().is_multiple_of(WORD) {
+        *bytes.add(offset) = value;
+        offset += 1;
       }
       let word = usize::from_ne_bytes([value; WORD]);
-      while n - i >= WORD {
-        *bytes.add(i).cast::<usize>() = word;
-        i += WORD;
+      while len - offset >= WORD {
+        *bytes.add(offset).cast::<usize>() = word;
+        offset += WORD;
       }
     }
-    while i < n {
-      *bytes.add(i) = value;
-      i += 1;
+    while offset < len {
+      *bytes.add(offset) = value;
+      offset += 1;
     }
   }
-  s
+  dest
 }
 
 /// Compares two byte sequences.
 ///
 /// # Safety
 ///
-/// `s1` and `s2` must be valid pointers to memory of at least `n` bytes.
+/// `left` and `right` must be valid pointers to memory of at least `len` bytes.
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn bcmp(
-  s1: *const c_void,
-  s2: *const c_void,
-  n: usize,
+  left: *const c_void,
+  right: *const c_void,
+  len: usize,
 ) -> i32 {
-  let bytes1 = s1.cast::<u8>();
-  let bytes2 = s2.cast::<u8>();
-  for i in 0..n {
-    let a = unsafe { *bytes1.add(i) };
-    let b = unsafe { *bytes2.add(i) };
-    if a != b {
-      return i32::from(a) - i32::from(b);
+  let bytes1 = left.cast::<u8>();
+  let bytes2 = right.cast::<u8>();
+  for offset in 0..len {
+    let left_byte = unsafe { *bytes1.add(offset) };
+    let right_byte = unsafe { *bytes2.add(offset) };
+    if left_byte != right_byte {
+      return i32::from(left_byte) - i32::from(right_byte);
     }
   }
   0
@@ -186,27 +188,27 @@ pub unsafe extern "C" fn bcmp(
 ///
 /// # Safety
 ///
-/// `s1` and `s2` must be valid pointers to memory of at least `n` bytes.
+/// `left` and `right` must be valid pointers to memory of at least `len` bytes.
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memcmp(
-  s1: *const c_void,
-  s2: *const c_void,
-  n: usize,
+  left: *const c_void,
+  right: *const c_void,
+  len: usize,
 ) -> i32 {
-  unsafe { bcmp(s1, s2, n) }
+  unsafe { bcmp(left, right, len) }
 }
 
 /// Calculates the length of a null-terminated string.
 ///
 /// # Safety
 ///
-/// `s` must be a valid pointer to a null-terminated string.
+/// `cstr` must be a valid pointer to a null-terminated string.
 #[cfg(not(target_os = "macos"))]
 #[unsafe(no_mangle)]
-pub const unsafe extern "C" fn strlen(s: *const i8) -> usize {
+pub const unsafe extern "C" fn strlen(cstr: *const i8) -> usize {
   let mut len = 0;
-  while unsafe { *s.add(len) } != 0 {
+  while unsafe { *cstr.add(len) } != 0 {
     len += 1;
   }
   len

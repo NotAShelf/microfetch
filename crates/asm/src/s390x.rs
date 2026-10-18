@@ -4,17 +4,17 @@ use super::{StatfsBuf, SysInfo, UtsNameBuf};
 
 pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe {
-    let fd: i32;
+    let ret: i32;
     core::arch::asm!(
       "svc 0",
       in("r1") 5i64,  // SYS_open
       in("r2") path,
       in("r3") flags,
       in("r4") 0i32,  // mode
-      lateout("r2") fd,
+      lateout("r2") ret,
       options(nostack)
     );
-    fd
+    ret
   }
 }
 

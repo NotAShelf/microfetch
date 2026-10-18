@@ -47,7 +47,7 @@ unsafe extern "C" {
     newp: *const c_void,
     newlen: usize,
   ) -> c_int;
-  fn gettimeofday(tp: *mut Timeval, tzp: *mut c_void) -> c_int;
+  fn gettimeofday(timeval: *mut Timeval, tzp: *mut c_void) -> c_int;
 
   // Mach host interfaces (live in libsystem_kernel, part of libSystem).
   fn mach_host_self() -> u32; // mach_port_t
@@ -223,25 +223,25 @@ pub fn macos_meminfo() -> Option<(u64, u64)> {
   // Apple Silicon uses 16 KiB pages; fall back to that if the sysctl is absent.
   let page = u64::from(macos_sysctl_u32(b"hw.pagesize\0").unwrap_or(16384));
 
-  let mut vm = VmStatistics64::default();
+  let mut vm_stats = VmStatistics64::default();
   let mut count =
     u32::try_from(size_of::<VmStatistics64>() / size_of::<i32>()).ok()?;
-  let kr = unsafe {
+  let ret = unsafe {
     host_statistics64(
       mach_host_self(),
       HOST_VM_INFO64,
-      ptr::from_mut(&mut vm).cast::<i32>(),
+      ptr::from_mut(&mut vm_stats).cast::<i32>(),
       &raw mut count,
     )
   };
-  if kr != 0 {
+  if ret != 0 {
     // Mach call failed; report total with unknown usage rather than erroring.
     return Some((0, total));
   }
 
-  let used = (u64::from(vm.active_count)
-    + u64::from(vm.wire_count)
-    + u64::from(vm.compressor_page_count))
+  let used = (u64::from(vm_stats.active_count)
+    + u64::from(vm_stats.wire_count)
+    + u64::from(vm_stats.compressor_page_count))
     * page;
   Some((used.min(total), total))
 }
