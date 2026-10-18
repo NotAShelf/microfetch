@@ -1,6 +1,8 @@
 // Pack logo rows into a marker-delimited stream:
 // 1 = blue, 2 = cyan, 0 = row separator.
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+use std::{env, error::Error, fs};
+
+fn main() -> Result<(), Box<dyn Error>> {
   let rows: &[&[(u8, &str)]] = &[
     &[(0, "⠀⠀⠀⠀⠀⠀⢼⣿⣄⠀⠀⠀"), (1, "⠹⣿⣷⡀⠀⣠⣿⡧⠀⠀⠀⠀⠀⠀")],
     &[(0, "⠀⠀⠀⠀⠀⠀⠈⢿⣿⣆⠀⠀⠀"), (1, "⠘⣿⣿⣴⣿⡿⠁⠀⠀⠀⠀⠀⠀")],
@@ -38,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
   }
 
-  let out_dir = std::env::var("OUT_DIR")?;
-  std::fs::write(format!("{out_dir}/logo.bin"), &out)?;
+  let out_dir = env::var("OUT_DIR")?;
+  fs::write(format!("{out_dir}/logo.bin"), &out)?;
   Ok(())
 }

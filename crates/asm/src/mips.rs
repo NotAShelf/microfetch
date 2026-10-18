@@ -1,11 +1,13 @@
 //! Syscall implementations for `mips`.
 
+use core::arch::asm;
+
 use super::{StatfsBuf, SysInfo, UtsNameBuf};
 
 pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "syscall",
       "beqz $7, 1f",
       "nop",
@@ -28,7 +30,7 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
 pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
   unsafe {
     let ret: isize;
-    core::arch::asm!(
+    asm!(
       "syscall",
       "beqz $7, 1f",
       "nop",
@@ -51,7 +53,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
 pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
   unsafe {
     let ret: isize;
-    core::arch::asm!(
+    asm!(
       "syscall",
       "beqz $7, 1f",
       "nop",
@@ -74,7 +76,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
 pub unsafe fn sys_close(fd: i32) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "syscall",
       "beqz $7, 1f",
       "nop",
@@ -95,7 +97,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
 pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "syscall",
       "beqz $7, 1f",
       "nop",
@@ -116,7 +118,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
 pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "syscall",
       "beqz $7, 1f",
       "nop",
@@ -124,7 +126,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
       "1:",
       inlateout("$2") 4000_i32 + 255 => ret,  // SYS_statfs64
       in("$4") path,
-      in("$5") core::mem::size_of::<StatfsBuf>(),
+      in("$5") size_of::<StatfsBuf>(),
       in("$6") buf,
       lateout("$7") _,
       lateout("$8") _, lateout("$9") _, lateout("$10") _, lateout("$11") _,
@@ -139,7 +141,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
 pub unsafe fn sys_sysinfo(info: *mut SysInfo) -> i64 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "syscall",
       "beqz $7, 1f",
       "nop",
@@ -164,7 +166,7 @@ pub unsafe fn sys_sched_getaffinity(
 ) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "syscall",
       "beqz $7, 1f",
       "nop",
@@ -186,7 +188,7 @@ pub unsafe fn sys_sched_getaffinity(
 
 pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe {
-    core::arch::asm!(
+    asm!(
       "syscall",
       in("$2") 4000_i32 + 1,  // SYS_exit
       in("$4") code,

@@ -1,11 +1,13 @@
 //! Syscall implementations for `aarch64`.
 
+use core::arch::asm;
+
 use super::{StatfsBuf, SysInfo, UtsNameBuf};
 
 pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "svc #0",
       in("x8") 56_i64,  // SYS_openat
       in("x0") -100_i32,  // AT_FDCWD
@@ -22,7 +24,7 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
 pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
   unsafe {
     let ret: isize;
-    core::arch::asm!(
+    asm!(
       "svc #0",
       in("x8") 63_i64,  // SYS_read
       in("x0") fd,
@@ -39,7 +41,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
 pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
   unsafe {
     let ret: isize;
-    core::arch::asm!(
+    asm!(
       "svc #0",
       in("x8") 64_i64,  // SYS_write
       in("x0") fd,
@@ -56,7 +58,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
 pub unsafe fn sys_close(fd: i32) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "svc #0",
       in("x8") 57_i64,  // SYS_close
       in("x0") fd,
@@ -70,7 +72,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
 pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "svc #0",
       in("x8") 160_i64,  // SYS_uname
       in("x0") buf,
@@ -84,7 +86,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
 pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "svc #0",
       in("x8") 43_i64,  // SYS_statfs
       in("x0") path,
@@ -100,7 +102,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
 pub unsafe fn sys_sysinfo(info: *mut SysInfo) -> i64 {
   unsafe {
     let ret: i64;
-    core::arch::asm!(
+    asm!(
       "svc #0",
       in("x8") 179_i64, // __NR_sysinfo
       in("x0") info,
@@ -118,7 +120,7 @@ pub unsafe fn sys_sched_getaffinity(
 ) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "svc #0",
       in("x8") 123_i64,  // __NR_sched_getaffinity
       in("x0") pid,
@@ -133,7 +135,7 @@ pub unsafe fn sys_sched_getaffinity(
 
 pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe {
-    core::arch::asm!(
+    asm!(
       "svc #0",
       in("x8") 93_i64,  // SYS_exit
       in("x0") code,

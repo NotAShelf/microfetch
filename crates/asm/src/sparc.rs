@@ -1,11 +1,13 @@
 //! Syscall implementations for `sparc`.
 
+use core::arch::asm;
+
 use super::{StatfsBuf, SysInfo, UtsNameBuf};
 
 pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "mov {nr}, %g1",
       "ta 0x10",
       "bcs,a 1f",
@@ -24,7 +26,7 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
 pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
   unsafe {
     let ret: isize;
-    core::arch::asm!(
+    asm!(
       "mov {nr}, %g1",
       "ta 0x10",
       "bcs,a 1f",
@@ -43,7 +45,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
 pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
   unsafe {
     let ret: isize;
-    core::arch::asm!(
+    asm!(
       "mov {nr}, %g1",
       "ta 0x10",
       "bcs,a 1f",
@@ -62,7 +64,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
 pub unsafe fn sys_close(fd: i32) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "mov {nr}, %g1",
       "ta 0x10",
       "bcs,a 1f",
@@ -79,7 +81,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
 pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "mov {nr}, %g1",
       "ta 0x10",
       "bcs,a 1f",
@@ -96,7 +98,7 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
 pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "mov {nr}, %g1",
       "ta 0x10",
       "bcs,a 1f",
@@ -104,7 +106,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
       "1:",
       nr = in(reg) 234_i32,  // SYS_statfs64
       inlateout("o0") path => ret,
-      in("o1") core::mem::size_of::<StatfsBuf>(),
+      in("o1") size_of::<StatfsBuf>(),
       in("o2") buf,
       options(nostack)
     );
@@ -115,7 +117,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
 pub unsafe fn sys_sysinfo(info: *mut SysInfo) -> i64 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "mov {nr}, %g1",
       "ta 0x10",
       "bcs,a 1f",
@@ -136,7 +138,7 @@ pub unsafe fn sys_sched_getaffinity(
 ) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "mov {nr}, %g1",
       "ta 0x10",
       "bcs,a 1f",
@@ -154,7 +156,7 @@ pub unsafe fn sys_sched_getaffinity(
 
 pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe {
-    core::arch::asm!(
+    asm!(
       "mov {nr}, %g1",
       "ta 0x10",
       nr = in(reg) 1_i32,  // SYS_exit
