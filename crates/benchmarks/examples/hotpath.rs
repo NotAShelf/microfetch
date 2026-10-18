@@ -2,8 +2,16 @@
 //! `no_std` with its own `_start`, so it cannot host hotpath; this runs the
 //! same `microfetch_lib::run` from a regular std binary instead.
 
-use std::{env, ffi::CString, os::unix::ffi::OsStringExt, ptr};
+extern crate alloc;
 
+use alloc::ffi::CString;
+use core::ptr;
+use std::{env, os::unix::ffi::OsStringExt as _};
+
+#[expect(
+  clippy::expect_used,
+  reason = "a profiling example has nowhere to report errors"
+)]
 fn main() {
   let env: Vec<CString> = env::vars_os()
     .map(|(key, value)| {

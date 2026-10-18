@@ -692,7 +692,8 @@ pub unsafe fn sys_exit(code: i32) -> ! {
 
 // The freestanding memory symbols exist everywhere but macOS, where
 // libSystem supplies them instead.
-#[cfg(all(test, not(target_os = "macos")))]
+#[cfg(test)]
+#[cfg(not(target_os = "macos"))]
 mod tests {
   use super::*;
 
