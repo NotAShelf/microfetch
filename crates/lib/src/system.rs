@@ -70,11 +70,7 @@ pub fn write_root_disk_usage(
   write_gib(w, total_bytes);
   w.push_str(" GiB (");
   w.push_str(colors.cyan);
-  let pct = if total_bytes > 0 {
-    used_bytes * 100 / total_bytes
-  } else {
-    0
-  };
+  let pct = (used_bytes * 100).checked_div(total_bytes).unwrap_or(0);
   w.push_u64(pct);
   w.push_byte(b'%');
   w.push_str(colors.reset);
@@ -128,11 +124,9 @@ pub fn write_memory_usage(
 ) -> Result<(), Error> {
   let (used_bytes, total_bytes) =
     crate::syscall::macos_meminfo().ok_or(Error::OsError(0))?;
-  let percentage_used = if total_bytes > 0 {
-    (used_bytes * 100 + total_bytes / 2) / total_bytes
-  } else {
-    0
-  };
+  let percentage_used = (used_bytes * 100 + total_bytes / 2)
+    .checked_div(total_bytes)
+    .unwrap_or(0);
 
   write_gib(w, used_bytes);
   w.push_str(" GiB / ");
@@ -209,11 +203,9 @@ pub fn write_memory_usage(
   }
 
   let (used_kb, total_kb) = parse_memory_info()?;
-  let percentage_used = if total_kb > 0 {
-    (used_kb * 100 + total_kb / 2) / total_kb
-  } else {
-    0
-  };
+  let percentage_used = (used_kb * 100 + total_kb / 2)
+    .checked_div(total_kb)
+    .unwrap_or(0);
 
   write_kb_as_gib(w, used_kb);
   w.push_str(" GiB / ");

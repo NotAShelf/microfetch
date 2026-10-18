@@ -24,13 +24,11 @@ pub fn write_os_pretty_name(w: &mut StackWriter) -> Result<(), Error> {
   let mut buf = [0u8; 64];
   if let Some(n) =
     crate::syscall::macos_sysctl_str(b"kern.osproductversion\0", &mut buf)
+    && let Ok(version) = core::str::from_utf8(&buf[..n])
+    && !version.is_empty()
   {
-    if let Ok(version) = core::str::from_utf8(&buf[..n]) {
-      if !version.is_empty() {
-        w.push_byte(b' ');
-        w.push_str(version);
-      }
-    }
+    w.push_byte(b' ');
+    w.push_str(version);
   }
   Ok(())
 }

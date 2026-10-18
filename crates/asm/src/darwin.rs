@@ -59,40 +59,48 @@ unsafe extern "C" {
   ) -> c_int;
 }
 
-pub(super) unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
+pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe { open(path.cast::<c_char>(), flags) }
 }
 
-pub(super) unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
+pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
   unsafe { read(fd, buf.cast::<c_void>(), count) }
 }
 
-pub(super) unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
+pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
   unsafe { write(fd, buf.cast::<c_void>(), count) }
 }
 
-pub(super) unsafe fn sys_close(fd: i32) -> i32 {
+pub unsafe fn sys_close(fd: i32) -> i32 {
   unsafe { close(fd) }
 }
 
-pub(super) unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
+pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
   unsafe { uname(buf) }
 }
 
-pub(super) unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
+pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
   unsafe { statfs(path.cast::<c_char>(), buf) }
 }
 
 /// macOS has no `sysinfo(2)`; uptime comes from [`macos_uptime_secs`] instead.
 /// This stub exists only so the generic wrapper in `lib.rs` keeps compiling.
-pub(super) unsafe fn sys_sysinfo(_info: *mut SysInfo) -> i64 {
+#[allow(
+  clippy::missing_const_for_fn,
+  reason = "keeps the signature of the syscall it stands in for"
+)]
+pub unsafe fn sys_sysinfo(_info: *mut SysInfo) -> i64 {
   -1
 }
 
 /// macOS has no `sched_getaffinity(2)`; core counts come from `sysctl`
 /// (`hw.logicalcpu` / `hw.physicalcpu`). This stub keeps the generic wrapper
 /// compiling.
-pub(super) unsafe fn sys_sched_getaffinity(
+#[allow(
+  clippy::missing_const_for_fn,
+  reason = "keeps the signature of the syscall it stands in for"
+)]
+pub unsafe fn sys_sched_getaffinity(
   _pid: i32,
   _mask_size: usize,
   _mask: *mut u8,
@@ -100,7 +108,7 @@ pub(super) unsafe fn sys_sched_getaffinity(
   -1
 }
 
-pub(super) unsafe fn sys_exit(code: i32) -> ! {
+pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe { _exit(code) }
 }
 
@@ -115,7 +123,7 @@ pub fn macos_sysctl_str(name: &[u8], out: &mut [u8]) -> Option<usize> {
     sysctlbyname(
       name.as_ptr().cast::<c_char>(),
       out.as_mut_ptr().cast::<c_void>(),
-      &mut len,
+      &raw mut len,
       ptr::null(),
       0,
     )
@@ -136,7 +144,7 @@ pub fn macos_sysctl_u32(name: &[u8]) -> Option<u32> {
     sysctlbyname(
       name.as_ptr().cast::<c_char>(),
       ptr::from_mut(&mut val).cast::<c_void>(),
-      &mut len,
+      &raw mut len,
       ptr::null(),
       0,
     )
@@ -156,7 +164,7 @@ fn macos_sysctl_u64(name: &[u8]) -> Option<u64> {
     sysctlbyname(
       name.as_ptr().cast::<c_char>(),
       ptr::from_mut(&mut val).cast::<c_void>(),
-      &mut len,
+      &raw mut len,
       ptr::null(),
       0,
     )
@@ -222,7 +230,7 @@ pub fn macos_meminfo() -> Option<(u64, u64)> {
       mach_host_self(),
       HOST_VM_INFO64,
       ptr::from_mut(&mut vm).cast::<i32>(),
-      &mut count,
+      &raw mut count,
     )
   };
   if kr != 0 {
@@ -240,10 +248,7 @@ pub fn macos_meminfo() -> Option<(u64, u64)> {
 /// `struct timeval` (`time_t` is 64-bit, `suseconds_t` is 32-bit on macOS).
 #[repr(C)]
 #[derive(Default)]
-#[allow(
-  dead_code,
-  reason = "tv_usec/_pad exist only to fix the struct layout"
-)]
+#[allow(dead_code, reason = "tv_usec/_pad exist only to fix the struct layout")]
 struct Timeval {
   tv_sec:  i64,
   tv_usec: i32,
@@ -264,7 +269,7 @@ pub fn macos_uptime_secs() -> Option<u64> {
       mib.as_ptr(),
       mib.len() as u32,
       ptr::from_mut(&mut boot).cast::<c_void>(),
-      &mut len,
+      &raw mut len,
       ptr::null(),
       0,
     )
@@ -274,7 +279,7 @@ pub fn macos_uptime_secs() -> Option<u64> {
   }
 
   let mut now = Timeval::default();
-  if unsafe { gettimeofday(&mut now, ptr::null_mut()) } != 0 {
+  if unsafe { gettimeofday(&raw mut now, ptr::null_mut()) } != 0 {
     return None;
   }
 

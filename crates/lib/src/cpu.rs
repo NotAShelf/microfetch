@@ -17,10 +17,9 @@ pub fn write_cpu_name(w: &mut StackWriter) {
   let mut buf = [0u8; 128];
   if let Some(n) =
     crate::syscall::macos_sysctl_str(b"machdep.cpu.brand_string\0", &mut buf)
+    && let Ok(name) = core::str::from_utf8(&buf[..n])
   {
-    if let Ok(name) = core::str::from_utf8(&buf[..n]) {
-      w.push_str(name);
-    }
+    w.push_str(name);
   }
 }
 

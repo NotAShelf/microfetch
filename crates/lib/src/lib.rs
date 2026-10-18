@@ -215,7 +215,7 @@ impl<'a> StackWriter<'a> {
 
   #[inline]
   #[must_use]
-  pub fn written(&self) -> &[u8] {
+  pub const fn written(&self) -> &[u8] {
     unsafe { core::slice::from_raw_parts(self.buf.as_ptr().cast(), self.pos) }
   }
 
@@ -238,7 +238,7 @@ impl<'a> StackWriter<'a> {
   }
 
   #[inline]
-  pub fn push_byte(&mut self, b: u8) {
+  pub const fn push_byte(&mut self, b: u8) {
     if self.pos < self.buf.len() {
       self.buf[self.pos].write(b);
       self.pos += 1;
@@ -343,11 +343,10 @@ fn write_row(
   if let Some(custom_logo) = custom_logo {
     w.push_str(c.cyan);
     w.push_str(custom_logo);
-    w.push_str(c.reset);
   } else {
     write_styled_row(w, c, logo);
-    w.push_str(c.reset);
   }
+  w.push_str(c.reset);
   w.push_str("  ");
   if row != 0 {
     write_styled_row(w, c, labels);
@@ -448,26 +447,26 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
 
   // Custom logo is 11 lines from MICROFETCH_LOGO env var, one per info row.
   // Lines beyond 11 are ignored; missing lines render as empty.
-  let custom_lines: [&str; 11];
+  let custom_lines: [&str; ROW_COUNT];
   let use_custom = !CUSTOM_LOGO.is_empty();
   let logo_lines = if use_custom {
     let mut lines_iter = CUSTOM_LOGO.split('\n');
     custom_lines = core::array::from_fn(|_| lines_iter.next().unwrap_or(""));
     &custom_lines
   } else {
-    &[""; 11] // unused, we use LOGO pairs below
+    &[""; ROW_COUNT] // unused, we use LOGO pairs below
   };
   let mut logo = LOGO;
   let mut labels = ROW_LABELS;
 
   w.push_byte(b'\n');
 
-  for row in 0..ROW_COUNT {
+  for (row, &line) in logo_lines.iter().enumerate() {
     write_row(
       &mut w,
       &c,
       row,
-      use_custom.then_some(logo_lines[row]),
+      use_custom.then_some(line),
       &mut logo,
       &mut labels,
       &utsname,
