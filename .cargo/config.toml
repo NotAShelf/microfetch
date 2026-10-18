@@ -14,3 +14,8 @@ rustflags = [ "-C", "force-unwind-tables=no" ]
 [target.aarch64-unknown-linux-gnu]
 linker    = "scripts/clang-wild"
 rustflags = [ "-C", "force-unwind-tables=no" ]
+
+# rustc links these as PIE by default, but `__start` applies no relocations
+# and never sets up $gp, so PIC code would read a GOT that does not exist.
+[target.'cfg(any(target_arch = "mips", target_arch = "mips64"))']
+rustflags = [ "-C", "relocation-model=static" ]

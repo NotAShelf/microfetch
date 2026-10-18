@@ -247,7 +247,7 @@ unsafe extern "C" fn _start() {
 #[cfg(target_arch = "mips64")]
 #[unsafe(no_mangle)]
 #[unsafe(naked)]
-unsafe extern "C" fn _start() {
+unsafe extern "C" fn __start() {
   naked_asm!(
     "move $a0, $sp",       // first arg = original sp (argc/argv)
     "daddiu $sp, $sp, -16",// reserve + keep 16-byte alignment (N64 ABI)
@@ -295,7 +295,7 @@ extern "C" fn __atomic_store_1(ptr: *mut u8, val: u8, _order: i32) {
 #[cfg(target_arch = "mips")]
 #[unsafe(no_mangle)]
 #[unsafe(naked)]
-unsafe extern "C" fn _start() {
+unsafe extern "C" fn __start() {
   naked_asm!(
     "move $a0, $sp",       // first arg = original sp (argc/argv)
     "addiu $sp, $sp, -24", // reserve 16-byte O32 shadow space + align
