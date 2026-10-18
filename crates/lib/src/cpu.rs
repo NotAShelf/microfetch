@@ -1,3 +1,5 @@
+use core::str;
+
 #[cfg(target_os = "linux")]
 use microfetch_asm::read_file_fast;
 
@@ -19,7 +21,7 @@ pub fn write_cpu_name(writer: &mut StackWriter) {
 
   let mut buf = [0_u8; 128];
   if let Some(len) = macos_sysctl_str(b"machdep.cpu.brand_string\0", &mut buf)
-    && let Ok(name) = core::str::from_utf8(&buf[..len])
+    && let Ok(name) = str::from_utf8(&buf[..len])
   {
     writer.push_str(name);
   }
@@ -208,7 +210,7 @@ fn read_cpu_max_khz(cpu: u32) -> Option<u32> {
   let path_len = format_cpufreq_path(&mut path, cpu);
   // SAFETY: the path is a constant prefix, decimal digits, and a constant
   // suffix, so it is ASCII by construction.
-  let path_str = unsafe { core::str::from_utf8_unchecked(&path[..path_len]) };
+  let path_str = unsafe { str::from_utf8_unchecked(&path[..path_len]) };
   let mut buf = [0_u8; 32];
   let len = read_file_fast(path_str, &mut buf).ok()?;
   let mut khz = 0_u32;
@@ -571,7 +573,7 @@ fn write_dt_compatible(writer: &mut StackWriter) -> bool {
   let Some(comma) = entry.iter().position(|&byte| byte == b',') else {
     return false;
   };
-  let Ok(model) = core::str::from_utf8(&entry[comma + 1..]) else {
+  let Ok(model) = str::from_utf8(&entry[comma + 1..]) else {
     return false;
   };
   if model.is_empty() {
@@ -604,7 +606,7 @@ fn extract_field<'data>(data: &'data [u8], key: &[u8]) -> Option<&'data str> {
           pos += 1;
         }
         // SAFETY: cpuinfo fields are ASCII
-        return Some(unsafe { core::str::from_utf8_unchecked(&line[pos..]) });
+        return Some(unsafe { str::from_utf8_unchecked(&line[pos..]) });
       }
     }
 

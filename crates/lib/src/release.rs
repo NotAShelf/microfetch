@@ -1,3 +1,5 @@
+#[cfg(target_os = "macos")] use core::str;
+
 #[cfg(target_os = "linux")]
 use microfetch_asm::read_file_fast;
 
@@ -23,7 +25,7 @@ pub fn write_os_pretty_name(writer: &mut StackWriter) {
   writer.push_str("macOS");
   let mut buf = [0_u8; 64];
   if let Some(len) = macos_sysctl_str(b"kern.osproductversion\0", &mut buf)
-    && let Ok(version) = core::str::from_utf8(&buf[..len])
+    && let Ok(version) = str::from_utf8(&buf[..len])
     && !version.is_empty()
   {
     writer.push_byte(b' ');

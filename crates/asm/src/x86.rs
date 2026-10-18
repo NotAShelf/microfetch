@@ -1,11 +1,13 @@
 //! Syscall implementations for `x86`.
 
+use core::arch::asm;
+
 use super::{StatfsBuf, SysInfo, UtsNameBuf};
 
 pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "push ebx",
       "mov ebx, {arg1:e}",
       "int 0x80",
@@ -22,7 +24,7 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
 pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
   unsafe {
     let ret: isize;
-    core::arch::asm!(
+    asm!(
       "push ebx",
       "mov ebx, {arg1:e}",
       "int 0x80",
@@ -39,7 +41,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
 pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
   unsafe {
     let ret: isize;
-    core::arch::asm!(
+    asm!(
       "push ebx",
       "mov ebx, {arg1:e}",
       "int 0x80",
@@ -56,7 +58,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
 pub unsafe fn sys_close(fd: i32) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "push ebx",
       "mov ebx, {arg1:e}",
       "int 0x80",
@@ -71,7 +73,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
 pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "push ebx",
       "mov ebx, {arg1:e}",
       "int 0x80",
@@ -86,14 +88,14 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
 pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "push ebx",
       "mov ebx, {arg1:e}",
       "int 0x80",
       "pop ebx",
       arg1 = in(reg) path,
       inlateout("eax") 268_i32 => ret,  // SYS_statfs64
-      in("ecx") core::mem::size_of::<StatfsBuf>(),
+      in("ecx") size_of::<StatfsBuf>(),
       in("edx") buf,
     );
     ret
@@ -103,7 +105,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
 pub unsafe fn sys_sysinfo(info: *mut SysInfo) -> i64 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "push ebx",
       "mov ebx, {arg1:e}",
       "int 0x80",
@@ -122,7 +124,7 @@ pub unsafe fn sys_sched_getaffinity(
 ) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "push ebx",
       "mov ebx, {arg1:e}",
       "int 0x80",
@@ -138,7 +140,7 @@ pub unsafe fn sys_sched_getaffinity(
 
 pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe {
-    core::arch::asm!(
+    asm!(
       "mov ebx, {code:e}",
       "int 0x80",
       code = in(reg) code,

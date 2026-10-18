@@ -11,8 +11,12 @@ pub mod system;
 pub mod uptime;
 
 use core::{
+  array,
   ffi::CStr,
   mem::MaybeUninit,
+  ptr,
+  slice,
+  str,
   sync::atomic::{AtomicPtr, Ordering},
 };
 
@@ -44,7 +48,7 @@ impl Error {
 
 // Store the environment pointer internally,initialized from `main()`. This
 // helps avoid the libc dependency *completely*.
-static ENVP: AtomicPtr<*const u8> = AtomicPtr::new(core::ptr::null_mut());
+static ENVP: AtomicPtr<*const u8> = AtomicPtr::new(ptr::null_mut());
 
 /// Initialize the environment pointer. Must be called before any `getenv()`
 /// calls. This is called from `main()` with the calculated `envp`.
@@ -113,7 +117,7 @@ pub fn getenv(name: &str) -> Option<&'static [u8]> {
           len += 1;
         }
         // SAFETY: We calculated the exact length
-        return Some(unsafe { core::slice::from_raw_parts(value_start, len) });
+        return Some(unsafe { slice::from_raw_parts(value_start, len) });
       }
     }
 
@@ -132,7 +136,7 @@ pub fn getenv(name: &str) -> Option<&'static [u8]> {
 /// `from_utf8_unchecked`.
 #[must_use = "this only reads the environment"]
 pub fn getenv_str(name: &str) -> Option<&'static str> {
-  getenv(name).map(|bytes| unsafe { core::str::from_utf8_unchecked(bytes) })
+  getenv(name).map(|bytes| unsafe { str::from_utf8_unchecked(bytes) })
 }
 
 /// Checks if an environment variable exists (regardless of its value).
@@ -195,7 +199,7 @@ impl<'buf> StackWriter<'buf> {
   #[inline]
   #[must_use = "this only borrows the written bytes"]
   pub const fn written(&self) -> &[u8] {
-    unsafe { core::slice::from_raw_parts(self.buf.as_ptr().cast(), self.pos) }
+    unsafe { slice::from_raw_parts(self.buf.as_ptr().cast(), self.pos) }
   }
 
   #[inline]
@@ -207,7 +211,7 @@ impl<'buf> StackWriter<'buf> {
   pub fn push_bytes(&mut self, bytes: &[u8]) {
     let len = bytes.len().min(self.buf.len() - self.pos);
     unsafe {
-      core::ptr::copy_nonoverlapping(
+      ptr::copy_nonoverlapping(
         bytes.as_ptr(),
         self.buf.as_mut_ptr().add(self.pos).cast(),
         len,
@@ -424,7 +428,7 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
   let use_custom = !CUSTOM_LOGO.is_empty();
   let logo_lines = if use_custom {
     let mut lines_iter = CUSTOM_LOGO.split('\n');
-    custom_lines = core::array::from_fn(|_| lines_iter.next().unwrap_or(""));
+    custom_lines = array::from_fn(|_| lines_iter.next().unwrap_or(""));
     &custom_lines
   } else {
     &[""; ROW_COUNT] // unused, we use LOGO pairs below

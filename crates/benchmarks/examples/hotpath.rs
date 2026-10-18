@@ -2,10 +2,10 @@
 //! `no_std` with its own `_start`, so it cannot host hotpath; this runs the
 //! same `microfetch_lib::run` from a regular std binary instead.
 
-use std::{ffi::CString, os::unix::ffi::OsStringExt, ptr};
+use std::{env, ffi::CString, os::unix::ffi::OsStringExt, ptr};
 
 fn main() {
-  let env: Vec<CString> = std::env::vars_os()
+  let env: Vec<CString> = env::vars_os()
     .map(|(key, value)| {
       let mut entry = key.into_vec();
       entry.push(b'=');

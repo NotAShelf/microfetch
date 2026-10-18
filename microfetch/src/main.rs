@@ -18,8 +18,12 @@
   )
 )]
 
+#[cfg(all(target_arch = "powerpc64", target_abi = "elfv1"))]
+use core::arch::global_asm;
 #[cfg(not(any(target_os = "macos", target_abi = "elfv1")))]
 use core::arch::naked_asm;
+#[cfg(not(test))] use core::panic::PanicInfo;
+#[cfg(all(not(test), target_arch = "sparc"))] use core::ptr;
 
 // The custom `_start` (and the `entry_rust` it calls) is Linux-only.
 #[cfg(not(any(target_os = "macos", target_abi = "elfv1")))]
@@ -167,7 +171,7 @@ unsafe extern "C" fn _start() {
 // in .opd whose first word is the real code address. We emit both manually via
 // `global_asm` so the kernel reads the descriptor and jumps into `_start_impl`.
 #[cfg(all(target_arch = "powerpc64", target_abi = "elfv1"))]
-core::arch::global_asm!(
+global_asm!(
   ".section .opd, \"aw\"",
   ".balign 8",
   ".globl _start",
@@ -279,13 +283,13 @@ unsafe extern "C" fn _start() {
 #[cfg(all(not(test), target_arch = "sparc"))]
 #[unsafe(no_mangle)]
 extern "C" fn __atomic_load_1(ptr: *const u8, _order: i32) -> u8 {
-  unsafe { core::ptr::read_volatile(ptr) }
+  unsafe { ptr::read_volatile(ptr) }
 }
 
 #[cfg(all(not(test), target_arch = "sparc"))]
 #[unsafe(no_mangle)]
 extern "C" fn __atomic_store_1(ptr: *mut u8, val: u8, _order: i32) {
-  unsafe { core::ptr::write_volatile(ptr, val) }
+  unsafe { ptr::write_volatile(ptr, val) }
 }
 
 #[cfg(target_arch = "mips")]
@@ -334,7 +338,7 @@ pub unsafe extern "C" fn main(argc: i32, argv: *const *const u8) -> i32 {
 
 #[cfg(not(test))]
 #[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
+fn panic(_info: &PanicInfo) -> ! {
   const PANIC_MSG: &[u8] = b"panic\n";
   unsafe {
     _ = sys_write(2, PANIC_MSG.as_ptr(), PANIC_MSG.len());

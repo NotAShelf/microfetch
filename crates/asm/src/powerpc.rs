@@ -1,11 +1,13 @@
 //! Syscall implementations for `powerpc`.
 
+use core::arch::asm;
+
 use super::{StatfsBuf, SysInfo, UtsNameBuf};
 
 pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "sc",
       "bns+ 2f",
       "neg 3, 3",
@@ -26,7 +28,7 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
 pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
   unsafe {
     let ret: isize;
-    core::arch::asm!(
+    asm!(
       "sc",
       "bns+ 2f",
       "neg 3, 3",
@@ -47,7 +49,7 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
 pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
   unsafe {
     let ret: isize;
-    core::arch::asm!(
+    asm!(
       "sc",
       "bns+ 2f",
       "neg 3, 3",
@@ -68,7 +70,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
 pub unsafe fn sys_close(fd: i32) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "sc",
       "bns+ 2f",
       "neg 3, 3",
@@ -87,7 +89,7 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
 pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "sc",
       "bns+ 2f",
       "neg 3, 3",
@@ -106,14 +108,14 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
 pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "sc",
       "bns+ 2f",
       "neg 3, 3",
       "2:",
       inlateout("r0") 252_i32 => _,  // SYS_statfs64
       inlateout("r3") path => ret,
-      inlateout("r4") core::mem::size_of::<StatfsBuf>() => _,
+      inlateout("r4") size_of::<StatfsBuf>() => _,
       inlateout("r5") buf => _,
       out("r6") _, out("r7") _, out("r8") _,
       out("r9") _, out("r10") _, out("r11") _, out("r12") _,
@@ -127,7 +129,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
 pub unsafe fn sys_sysinfo(info: *mut SysInfo) -> i64 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "sc",
       "bns+ 2f",
       "neg 3, 3",
@@ -150,7 +152,7 @@ pub unsafe fn sys_sched_getaffinity(
 ) -> i32 {
   unsafe {
     let ret: i32;
-    core::arch::asm!(
+    asm!(
       "sc",
       "bns+ 2f",
       "neg 3, 3",
@@ -170,7 +172,7 @@ pub unsafe fn sys_sched_getaffinity(
 
 pub unsafe fn sys_exit(code: i32) -> ! {
   unsafe {
-    core::arch::asm!(
+    asm!(
       "li 0, 1",  // SYS_exit
       "sc",
       in("r3") code,
