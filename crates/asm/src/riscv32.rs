@@ -21,7 +21,7 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
 
 pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
   unsafe {
-    let ret: i32;
+    let ret: isize;
     core::arch::asm!(
       "ecall",
       in("a7") 63i32,  // SYS_read
@@ -31,13 +31,13 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
       lateout("a0") ret,
       options(nostack)
     );
-    ret as isize
+    ret
   }
 }
 
 pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
   unsafe {
-    let ret: i32;
+    let ret: isize;
     core::arch::asm!(
       "ecall",
       in("a7") 64i32,  // SYS_write
@@ -47,7 +47,7 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
       lateout("a0") ret,
       options(nostack)
     );
-    ret as isize
+    ret
   }
 }
 

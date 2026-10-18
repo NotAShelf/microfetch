@@ -4,7 +4,7 @@ use super::{StatfsBuf, SysInfo, UtsNameBuf};
 
 pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
   unsafe {
-    let fd: i64;
+    let fd: i32;
     core::arch::asm!(
       "syscall",
       in("rax") 2i64,  // SYS_open
@@ -16,16 +16,13 @@ pub unsafe fn sys_open(path: *const u8, flags: i32) -> i32 {
       lateout("r11") _,
       options(nostack)
     );
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      fd as i32
-    }
+    fd
   }
 }
 
 pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
   unsafe {
-    let ret: i64;
+    let ret: isize;
     core::arch::asm!(
       "syscall",
       in("rax") 0i64,  // SYS_read
@@ -38,16 +35,13 @@ pub unsafe fn sys_read(fd: i32, buf: *mut u8, count: usize) -> isize {
       options(nostack)
     );
 
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      ret as isize
-    }
+    ret
   }
 }
 
 pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
   unsafe {
-    let ret: i64;
+    let ret: isize;
     core::arch::asm!(
       "syscall",
       in("rax") 1i64,  // SYS_write
@@ -60,16 +54,13 @@ pub unsafe fn sys_write(fd: i32, buf: *const u8, count: usize) -> isize {
       options(nostack)
     );
 
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      ret as isize
-    }
+    ret
   }
 }
 
 pub unsafe fn sys_close(fd: i32) -> i32 {
   unsafe {
-    let ret: i64;
+    let ret: i32;
     core::arch::asm!(
       "syscall",
       in("rax") 3i64,  // SYS_close
@@ -79,16 +70,13 @@ pub unsafe fn sys_close(fd: i32) -> i32 {
       lateout("r11") _,
       options(nostack)
     );
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      ret as i32
-    }
+    ret
   }
 }
 
 pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
   unsafe {
-    let ret: i64;
+    let ret: i32;
     core::arch::asm!(
       "syscall",
       in("rax") 63i64,  // SYS_uname
@@ -99,16 +87,13 @@ pub unsafe fn sys_uname(buf: *mut UtsNameBuf) -> i32 {
       options(nostack)
     );
 
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      ret as i32
-    }
+    ret
   }
 }
 
 pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
   unsafe {
-    let ret: i64;
+    let ret: i32;
     core::arch::asm!(
       "syscall",
       in("rax") 137i64,  // SYS_statfs
@@ -120,10 +105,7 @@ pub unsafe fn sys_statfs(path: *const u8, buf: *mut StatfsBuf) -> i32 {
       options(nostack)
     );
 
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      ret as i32
-    }
+    ret
   }
 }
 
@@ -149,7 +131,7 @@ pub unsafe fn sys_sched_getaffinity(
   mask: *mut u8,
 ) -> i32 {
   unsafe {
-    let ret: i64;
+    let ret: i32;
     core::arch::asm!(
       "syscall",
       in("rax") 204i64,  // __NR_sched_getaffinity
@@ -161,10 +143,7 @@ pub unsafe fn sys_sched_getaffinity(
       lateout("r11") _,
       options(nostack)
     );
-    #[allow(clippy::cast_possible_truncation)]
-    {
-      ret as i32
-    }
+    ret
   }
 }
 

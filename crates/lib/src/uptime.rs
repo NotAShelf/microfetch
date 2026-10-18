@@ -12,10 +12,11 @@ pub fn write_uptime(w: &mut StackWriter) {
     if unsafe { sys_sysinfo(info.as_mut_ptr()) } != 0 {
       return;
     }
-    #[allow(clippy::cast_sign_loss)]
-    unsafe {
-      info.assume_init().uptime as u64
-    }
+    let Ok(seconds) = u64::try_from(unsafe { info.assume_init() }.uptime)
+    else {
+      return;
+    };
+    seconds
   };
   #[cfg(target_os = "macos")]
   let Some(uptime_seconds) = crate::syscall::macos_uptime_secs() else {
