@@ -36,7 +36,8 @@ in
         fileset = fs.unions [
           (s + /.cargo)
           (s + /crates)
-          (s + /microfetch)
+          (s + /build.rs)
+          (s + /src)
           (s + /Cargo.lock)
           (s + /Cargo.toml)
         ];
