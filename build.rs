@@ -34,13 +34,15 @@ fn main() -> io::Result<()> {
   // Remove unreferenced input sections
   println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--gc-sections");
   // Strip all symbol table entries
-  if env::var("DEBUG").as_deref() != Ok("true") {
+  let debug = env::var("DEBUG").as_deref() == Ok("true");
+  if !debug {
     println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--strip-all");
   }
+  // Omit the .note.gnu.build-id section, which split debug info is found by
+  let build_id = if debug { "sha1" } else { "none" };
+  println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--build-id={build_id}");
   // Nothing unwinds with panic=abort, so skip the unwinder's lookup table
   println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--no-eh-frame-hdr");
-  // Omit the .note.gnu.build-id section
-  println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--build-id=none");
   // Disable RELRO (removes relro_padding)
   println!("cargo:rustc-link-arg-bin=microfetch=-Wl,-z,norelro");
 
