@@ -1,11 +1,9 @@
 name: Tag and Release
 
 on:
-  workflow_dispatch:
-  workflow_run: # zizmor: ignore[dangerous-triggers]
-    workflows: [CI]
-    types: [completed]
+  push:
     branches: [main]
+  workflow_dispatch:
 
 permissions: {}
 
@@ -14,11 +12,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ci:
+    name: CI
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
+
   prepare:
     permissions:
       contents: write
       id-token: write
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    needs: ci
     uses: manic-systems/workflows/.github/workflows/rust-release.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
     with:
       stage: prepare
