@@ -29,11 +29,11 @@ edition      = "2024"
 license      = "GPL-3.0"
 repository   = "https://github.com/notashelf/microfetch"
 rust-version = "1.95.0"
-version      = "1.2.0"
+version      = "1.2.1"
 
 [workspace.dependencies]
-microfetch-asm = { path = "./crates/asm", version = "1.2.0" }
-microfetch-lib = { path = "./crates/lib", version = "1.2.0" }
+microfetch-asm = { path = "./crates/asm", version = "1.2.1" }
+microfetch-lib = { path = "./crates/lib", version = "1.2.1" }
 
 criterion = { default-features = false, features = [ "cargo_bench_support" ], version = "0.8.2" }
 
