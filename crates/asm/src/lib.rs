@@ -22,6 +22,8 @@
 
 #[cfg(not(target_os = "macos"))]
 use core::ffi::{c_char, c_void};
+#[cfg(all(not(test), not(target_os = "macos")))]
+use core::{ptr, slice};
 
 // Per-arch syscall implementations live in their own module files.
 // macOS is matched first; there `target_arch` is `aarch64`, but the
@@ -254,11 +256,86 @@ pub unsafe extern "C" fn entry_rust(stack: *const usize) -> i32 {
   let argc = unsafe { *stack };
   let argv = unsafe { stack.add(1).cast::<*const u8>() };
 
+  unsafe { relocate(stack.add(argc + 2)) };
+
   // argc is unlikely to exceed i32::MAX on real systems
   let argc_i32 = i32::try_from(argc).unwrap_or(i32::MAX);
 
   // Call the main function (defined by the binary crate)
   unsafe { main(argc_i32, argv) }
+}
+
+/// Our `_dl_relocate_static_pie`. This runs before any data pointer is valid,
+/// and skips type checks since a static PIE has only relative relocations.
+///
+/// # Safety
+///
+/// `envp` must point to the kernel-provided environment array, followed by the
+/// auxiliary vector.
+#[cfg(all(not(test), not(target_os = "macos")))]
+unsafe fn relocate(envp: *const usize) {
+  let mut auxv = envp;
+  while unsafe { auxv.read_volatile() } != 0 {
+    auxv = unsafe { auxv.add(1) };
+  }
+
+  let (mut phdrs, mut phent, mut phnum) = (0_usize, 0_usize, 0_usize);
+  loop {
+    auxv = unsafe { auxv.add(1) };
+    match unsafe { *auxv } {
+      0 => break,
+      3 => phdrs = unsafe { *auxv.add(1) },
+      4 => phent = unsafe { *auxv.add(1) },
+      5 => phnum = unsafe { *auxv.add(1) },
+      _ => {},
+    }
+    auxv = unsafe { auxv.add(1) };
+  }
+
+  let Some(dynamic_vaddr) = (0..phnum).find_map(|index| {
+    let phdr = ptr::with_exposed_provenance::<usize>(
+      phdrs.wrapping_add(index.wrapping_mul(phent)),
+    );
+    unsafe { (*phdr.cast::<u32>() == 2).then(|| *phdr.add(2)) }
+  }) else {
+    return;
+  };
+
+  // GNU ld omits PT_PHDR, so the base is the ELF header just before the phdrs.
+  let base = phdrs.wrapping_sub(if WORD == 8 { 64 } else { 52 });
+  if unsafe { *ptr::with_exposed_provenance::<[u8; 4]>(base) } != *b"\x7fELF" {
+    unsafe { sys_exit(127) };
+  }
+
+  let [mut rela, mut rela_size, mut rel, mut rel_size] = [0_usize; 4];
+  let mut dynamic = ptr::with_exposed_provenance::<[usize; 2]>(
+    base.wrapping_add(dynamic_vaddr),
+  );
+  loop {
+    match unsafe { *dynamic } {
+      [0, _] => break,
+      [7, value] => rela = value,
+      [8, value] => rela_size = value,
+      [17, value] => rel = value,
+      [18, value] => rel_size = value,
+      _ => {},
+    }
+    dynamic = unsafe { dynamic.add(1) };
+  }
+
+  let table = |addr: usize, size: usize| unsafe {
+    let start = ptr::with_exposed_provenance::<usize>(base.wrapping_add(addr));
+    slice::from_raw_parts(start, size / WORD)
+  };
+  let slot = |offset| {
+    ptr::with_exposed_provenance_mut::<usize>(base.wrapping_add(offset))
+  };
+  for &[offset, _, addend] in table(rela, rela_size).as_chunks().0 {
+    unsafe { *slot(offset) = base.wrapping_add(addend) };
+  }
+  for &[offset, _] in table(rel, rel_size).as_chunks().0 {
+    unsafe { *slot(offset) = (*slot(offset)).wrapping_add(base) };
+  }
 }
 
 // External main function that must be defined by the binary using this crate.
