@@ -132,6 +132,10 @@ fn get_core_count(threads: u32) -> u32 {
 /// by reading `/sys/devices/cpu_core/cpus` and `/sys/devices/cpu_atom/cpus`.
 #[cfg(target_os = "linux")]
 fn get_pe_cores() -> Option<(u32, u32)> {
+  if !cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
+    return None;
+  }
+
   let perf = count_pmu_cores("/sys/devices/cpu_core/cpus")?;
   let eff = count_pmu_cores("/sys/devices/cpu_atom/cpus").unwrap_or(0);
   (perf > 0 && eff > 0).then_some((perf, eff))
@@ -327,7 +331,8 @@ fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
       // Octeon presets loops_per_jiffy to clock_rate/HZ, so its BogoMIPS is
       // exactly 2x the core clock, unlike the 1:1 of other MIPS.
       // https://github.com/torvalds/linux/blob/v6.19/arch/mips/cavium-octeon/csrc-octeon.c#L40
-      if *key == b"BogoMIPS"
+      if cfg!(any(target_arch = "mips", target_arch = "mips64"))
+        && *key == b"BogoMIPS"
         && cpuinfo.windows(6).any(|window| window == b"Octeon")
       {
         mhz /= 2;
@@ -340,7 +345,9 @@ fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
   }
   // SPARC exposes its clock as `Cpu0ClkTck : <hex>`,
   // which signifies ticks per second in hex.
-  if let Some(val) = extract_field(cpuinfo, b"Cpu0ClkTck") {
+  if cfg!(any(target_arch = "sparc64", target_arch = "sparc"))
+    && let Some(val) = extract_field(cpuinfo, b"Cpu0ClkTck")
+  {
     let mut hz = 0_u64;
     let mut seen = false;
     for &byte in val.as_bytes() {
@@ -389,7 +396,8 @@ fn write_model_name(writer: &mut StackWriter) {
       true
     },
     None => {
-      write_dt_compatible(writer)
+      (cfg!(not(any(target_arch = "x86", target_arch = "x86_64")))
+        && write_dt_compatible(writer))
         || (cfg!(target_arch = "aarch64") && write_arm_part(writer, data))
     },
   };
