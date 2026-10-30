@@ -37,6 +37,8 @@ fn main() -> io::Result<()> {
   if env::var("DEBUG").as_deref() != Ok("true") {
     println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--strip-all");
   }
+  // Nothing unwinds with panic=abort, so skip the unwinder's lookup table
+  println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--no-eh-frame-hdr");
   // Omit the .note.gnu.build-id section
   println!("cargo:rustc-link-arg-bin=microfetch=-Wl,--build-id=none");
   // Disable RELRO (removes relro_padding)
