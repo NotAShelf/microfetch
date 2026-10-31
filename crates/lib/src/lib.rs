@@ -22,6 +22,8 @@ use core::{
 
 use microfetch_asm::{UtsNameBuf, sys_uname, sys_write};
 
+use crate::system::Memory;
+
 /// A simple error type for microfetch operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
@@ -252,7 +254,7 @@ impl<'buf> StackWriter<'buf> {
 }
 
 /// Custom logo art embedded at compile time via the `MICROFETCH_LOGO`
-/// environment variable. Set it to 11 newline-separated lines of ASCII/Unicode
+/// environment variable. Set it to 13 newline-separated lines of ASCII/Unicode
 /// art when building to replace the default NixOS logo:
 ///
 /// ```sh
@@ -268,17 +270,19 @@ const CUSTOM_LOGO: &str = match option_env!("MICROFETCH_LOGO") {
 
 /// Packed logo rows. `0` separates rows; `1` and `2` select colors.
 const LOGO: &[u8] = concat!(
-  "\x01⠀⠀⠀⠀⠀⠀⢼⣿⣄⠀⠀⠀\x02⠹⣿⣷⡀⠀⣠⣿⡧⠀⠀⠀⠀⠀⠀\0",
-  "\x01⠀⠀⠀⠀⠀⠀⠈⢿⣿⣆⠀⠀⠀\x02⠘⣿⣿⣴⣿⡿⠁⠀⠀⠀⠀⠀⠀\0",
-  "\x01⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡜\x02⢿⣿⣟⠀⠀⠀\x01⢀⡄⠀⠀⠀\0",
-  "\x01⠀⠀⠀⠉⠉⠉⠉\x02⣩⣭⡭\x01⠉⠉⠉⠉⠉\x02⠈⢿⣿⣆⠀\x01⢠⣿⣿⠂⠀⠀\0",
-  "\x02⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀⠀⠀⢻⡟\x01⣡⣿⣿⠃⠀⠀⠀\0",
-  "\x02⢸⣿⣿⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\x01⣰⣿⣿⣿⣿⣿⣿⡇\0",
-  "\x02⠀⠀⠀⢠⣿⣿⢋\x01⣼⣧⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⡟⠀⠀⠀⠀⠀⠀\0",
-  "\x02⠀⠀⠠⣿⣿⠃⠀\x01⠹⣿⣷⡀\x02⣀⣀⣀⣀⣀\x01⣚⣛⣋\x02⣀⣀⣀⣀⠀⠀⠀\0",
-  "\x02⠀⠀⠀⠘⠁⠀⠀⠀\x01⣽⣿⣷⡜\x02⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀\0",
-  "\x01⠀⠀⠀⠀⠀⠀⢀⣾⣿⠟⣿⣿⡄⠀⠀⠀\x02⠹⣿⣷⡀⠀⠀⠀⠀⠀⠀\0",
-  "\x01⠀⠀⠀⠀⠀⠀⢺⣿⠋⠀⠈⢿⣿⣆⠀⠀⠀\x02⠙⣿⡗⠀⠀⠀⠀⠀⠀",
+  "\x01⠀⠀⠀⠀⠀⠀⠀⣼⣿⣦⠀⠀⠀⠀\x02⢿⣿⣷⡄⠀⢀⣴⣿⣦⠀⠀⠀⠀⠀⠀⠀\0",
+  "\x01⠀⠀⠀⠀⠀⠀⠀⠙⣿⣿⣷⡀⠀⠀\x02⠈⢻⣿⣿⣆⣾⣿⣿⠃⠀⠀⠀⠀⠀⠀⠀\0",
+  "\x01⠀⠀⠀⠀⢠⣤⣤⣤⣼⣿⣿⣷⣤⣤⣤⣤\x02⢻⣿⣿⣿⡿⠁⠀⠀⠀\x01⡀⠀⠀⠀⠀\0",
+  "\x01⠀⠀⠀⠠⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠷\x02⠹⣿⣿⣧⠀⠀\x01⢀⣼⣷⡄⠀⠀⠀\0",
+  "\x02⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⣿⠃⠀⠀⠀⠀⠀⠀⠹⣿⣿⣧\x01⢀⣾⣿⣿⠃⠀⠀⠀\0",
+  "\x02⠀⣀⣀⣀⣀⣀⣠⣾⣿⡿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠘⣿⠏\x01⣿⣿⣿⣁⣀⣀⣀⠀\0",
+  "\x02⠰⣿⣿⣿⣿⣿⣿⣿⡿\x01⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⠂\0",
+  "\x02⠀⠈⠉⠉⣹⣿⣿⡟\x01⣼⣿⣄⠀⠀⠀⠀⠀⠀⠀⠀⣰⣿⣿⡟⠁⠀⠀⠀⠀⠀⠀\0",
+  "\x02⠀⠀⠀⣰⣿⣿⡟⠀\x01⢻⣿⣿⣆⠀⠀⠀⠀⠀⠀⠴⠿⠿⠟⠀⠀⠀⠀⠀⠀⠀⠀\0",
+  "\x02⠀⠀⠀⠈⢿⠏⠀⠀⠀\x01⢻⣿⣿⣧\x02⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠁⠀⠀⠀\0",
+  "\x01⠀⠀⠀⠀⠀⠀⠀⠀⣰⣿⣿⣿⣿⣧\x02⠉⠉⠉⠉⢿⣿⣿⣏⠉⠉⠉⠀⠀⠀⠀⠀\0",
+  "\x01⠀⠀⠀⠀⠀⠀⠀⣰⣿⣿⡟⠙⣿⣿⣷⡀⠀⠀⠀\x02⢻⣿⣿⣆⠀⠀⠀⠀⠀⠀⠀\0",
+  "\x01⠀⠀⠀⠀⠀⠀⠀⠹⠿⠏⠀⠀⠘⠿⠿⠷⠀⠀⠀⠀\x02⠻⠿⠏⠀⠀⠀⠀⠀⠀⠀",
 )
 .as_bytes();
 
@@ -313,9 +317,10 @@ fn write_styled_row(
   }
 }
 
-const ROW_COUNT: usize = 11;
+const ROW_COUNT: usize = 13;
 const ROW_LABELS: &[u8] = concat!(
   "\x02\u{F313}  \x01System\x03       \u{E621} \0",
+  "\x02\u{F108}  \x01Machine\x03      \u{E621} \0",
   "\x02\u{E712}  \x01Kernel\x03       \u{E621} \0",
   "\x02\u{F2DB}  \x01CPU\x03          \u{E621} \0",
   "\x02\u{F4BC}  \x01Topology\x03     \u{E621} \0",
@@ -323,29 +328,22 @@ const ROW_LABELS: &[u8] = concat!(
   "\x02\u{F017}  \x01Uptime\x03       \u{E621} \0",
   "\x02\u{F2D2}  \x01Desktop\x03      \u{E621} \0",
   "\x02\u{F035B}  \x01Memory\x03       \u{E621} \0",
+  "\x02\u{F04E1}  \x01Swap\x03         \u{E621} \0",
   "\x02\u{F194E}  \x01Storage (/)\x03  \u{E621} \0",
   "\x02\u{E22B}  \x01Colors\x03       \u{E621} \0",
 )
 .as_bytes();
 
-/// Write one row: logo + label + value.
+/// Write the label and value of one row, after its logo line.
 #[inline(never)]
 fn write_row(
   writer: &mut StackWriter,
   colors: &colors::Colors,
   row: usize,
-  custom_logo: Option<&str>,
-  logo: &mut &[u8],
   labels: &mut &[u8],
   utsname: &UtsName,
+  memory: Option<&Memory>,
 ) {
-  writer.push_str("    ");
-  if let Some(logo_text) = custom_logo {
-    writer.push_str(colors.cyan);
-    writer.push_str(logo_text);
-  } else {
-    write_styled_row(writer, colors, logo);
-  }
   writer.push_str(colors.reset);
   writer.push_str("  ");
   if row != 0 {
@@ -358,14 +356,16 @@ fn write_row(
       writer.push_str(colors.reset);
     },
     1 => release::write_os_pretty_name(writer),
-    2 => release::write_system_info(writer, utsname),
-    3 => cpu::write_cpu_name(writer),
-    4 => cpu::write_cpu_cores(writer),
-    5 => system::write_shell(writer),
-    6 => uptime::write(writer),
-    7 => desktop::write_desktop_info(writer),
-    8 => system::write_memory_usage(writer, colors),
-    9 => system::write_root_disk_usage(writer, colors),
+    2 => release::write_machine(writer),
+    3 => release::write_system_info(writer, utsname),
+    4 => cpu::write_cpu_name(writer),
+    5 => cpu::write_cpu_cores(writer),
+    6 => system::write_shell(writer),
+    7 => uptime::write(writer),
+    8 => desktop::write_desktop_info(writer),
+    9 => system::write_memory_usage(writer, colors, memory),
+    10 => system::write_swap_usage(writer, colors, memory),
+    11 => system::write_root_disk_usage(writer, colors),
     _ => colors::write_dots(writer, colors),
   }
   writer.push_byte(b'\n');
@@ -429,14 +429,15 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
   }
 
   let utsname = UtsName::uname()?;
+  let memory = Memory::read();
   let no_color = colors::is_no_color();
   let colors = colors::Colors::new(no_color);
 
-  let mut buf = [MaybeUninit::uninit(); 2560];
+  let mut buf = [MaybeUninit::uninit(); 3072];
   let mut writer = StackWriter::new(&mut buf);
 
-  // Custom logo is 11 lines from MICROFETCH_LOGO env var, one per info row.
-  // Lines beyond 11 are ignored; missing lines render as empty.
+  // Custom logo is 13 lines from MICROFETCH_LOGO env var, one per info row.
+  // Lines beyond 13 are ignored; missing lines render as empty.
   let custom_lines: [&str; ROW_COUNT];
   let use_custom = !CUSTOM_LOGO.is_empty();
   let logo_lines = if use_custom {
@@ -452,14 +453,21 @@ pub unsafe fn run(argc: i32, argv: *const *const u8) -> Result<(), Error> {
   writer.push_byte(b'\n');
 
   for (row, &line) in logo_lines.iter().enumerate() {
+    writer.push_str("    ");
+    if use_custom {
+      writer.push_str(colors.cyan);
+      writer.push_str(line);
+    } else {
+      write_styled_row(&mut writer, &colors, &mut logo);
+    }
+
     write_row(
       &mut writer,
       &colors,
       row,
-      use_custom.then_some(line),
-      &mut logo,
       &mut labels,
       &utsname,
+      memory.as_ref(),
     );
   }
 

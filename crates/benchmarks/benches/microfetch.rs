@@ -8,7 +8,7 @@ use microfetch_lib::{
   cpu,
   desktop,
   release,
-  system,
+  system::{self, Memory},
   uptime,
 };
 
@@ -33,6 +33,14 @@ fn main_benchmark(criterion: &mut Criterion) {
       let mut buf = [MaybeUninit::uninit(); 256];
       let mut writer = StackWriter::new(&mut buf);
       release::write_os_pretty_name(&mut writer);
+      black_box(writer.written());
+    });
+  });
+  criterion.bench_function("machine", |bencher| {
+    bencher.iter(|| {
+      let mut buf = [MaybeUninit::uninit(); 256];
+      let mut writer = StackWriter::new(&mut buf);
+      release::write_machine(&mut writer);
       black_box(writer.written());
     });
   });
@@ -88,7 +96,8 @@ fn main_benchmark(criterion: &mut Criterion) {
     bencher.iter(|| {
       let mut buf = [MaybeUninit::uninit(); 256];
       let mut writer = StackWriter::new(&mut buf);
-      system::write_memory_usage(&mut writer, &colors);
+      let memory = Memory::read();
+      system::write_memory_usage(&mut writer, &colors, memory.as_ref());
       black_box(writer.written());
     });
   });
