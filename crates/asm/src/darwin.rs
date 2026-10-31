@@ -213,6 +213,35 @@ pub fn macos_meminfo() -> Option<(u64, u64)> {
   Some((used.min(total), total))
 }
 
+/// Mirror of `struct xsw_usage` (`<sys/sysctl.h>`), the `vm.swapusage` value.
+#[repr(C)]
+#[derive(Default)]
+struct XswUsage {
+  total:     u64,
+  avail:     u64,
+  used:      u64,
+  pagesize:  u32,
+  encrypted: i32,
+}
+
+/// Returns `(used_bytes, total_bytes)` of swap from `vm.swapusage`.
+#[must_use = "this only queries the kernel"]
+pub fn macos_swapinfo() -> Option<(u64, u64)> {
+  let mut usage = XswUsage::default();
+  let mut len = size_of::<XswUsage>();
+  let ret = unsafe {
+    sysctlbyname(
+      c"vm.swapusage".as_ptr(),
+      ptr::from_mut(&mut usage).cast::<c_void>(),
+      &raw mut len,
+      ptr::null(),
+      0,
+    )
+  };
+  (ret == 0_i32 && len == size_of::<XswUsage>())
+    .then_some((usage.used, usage.total))
+}
+
 /// `struct timeval` (`time_t` is 64-bit, `suseconds_t` is 32-bit on macOS).
 #[repr(C)]
 #[derive(Default)]
