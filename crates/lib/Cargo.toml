@@ -8,7 +8,7 @@ license.workspace      = true
 repository.workspace   = true
 
 [dependencies]
-hotpath                  = { optional = true, version = "0.28.3" }
+hotpath                  = { optional = true, version = "0.29.0" }
 microfetch-asm.workspace = true
 
 [features]
