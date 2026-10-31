@@ -78,11 +78,6 @@ fn write_gib(writer: &mut StackWriter, bytes: u64) {
   write_centi_gib(writer, (bytes * 100 + (1 << 29)) >> 30);
 }
 
-#[cfg(target_os = "linux")]
-fn write_kb_as_gib(writer: &mut StackWriter, kb: u64) {
-  write_centi_gib(writer, (kb * 100 + (1 << 19)) >> 20);
-}
-
 /// Fast integer parsing without stdlib overhead.
 #[cfg(target_os = "linux")]
 #[inline]
@@ -98,23 +93,82 @@ fn parse_u64_fast(bytes: &[u8]) -> u64 {
   result
 }
 
-/// Writes the system memory usage information via `sysctl`/Mach (macOS).
-/// Writes nothing if the memory statistics cannot be retrieved.
-#[cfg(target_os = "macos")]
-#[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_memory_usage(writer: &mut StackWriter, colors: &Colors) {
-  use microfetch_asm::darwin::macos_meminfo;
+/// RAM and swap usage in bytes.
+pub struct Memory {
+  used:       u64,
+  total:      u64,
+  swap_used:  u64,
+  swap_total: u64,
+}
 
-  let Some((used_bytes, total_bytes)) = macos_meminfo() else {
-    return;
-  };
-  let percentage_used = (used_bytes * 100 + total_bytes / 2)
-    .checked_div(total_bytes)
-    .unwrap_or(0);
+impl Memory {
+  /// Reads RAM and swap usage via `sysctl`/Mach (macOS).
+  #[cfg(target_os = "macos")]
+  #[cfg_attr(feature = "hotpath", hotpath::measure)]
+  #[must_use = "this only queries the kernel"]
+  pub fn read() -> Option<Self> {
+    use microfetch_asm::darwin::{macos_meminfo, macos_swapinfo};
 
-  write_gib(writer, used_bytes);
+    let (used, total) = macos_meminfo()?;
+    let (swap_used, swap_total) = macos_swapinfo().unwrap_or((0, 0));
+    Some(Self {
+      used,
+      total,
+      swap_used,
+      swap_total,
+    })
+  }
+
+  /// Reads RAM and swap usage from `/proc/meminfo`.
+  #[cfg(target_os = "linux")]
+  #[cfg_attr(feature = "hotpath", hotpath::measure)]
+  #[must_use = "this only reads /proc/meminfo"]
+  pub fn read() -> Option<Self> {
+    let mut buffer = [0_u8; 1024];
+    let bytes_read = read_file_fast("/proc/meminfo", &mut buffer).ok()?;
+
+    let mut mem_total = 0_u64;
+    let mut mem_available = 0_u64;
+    let mut swap_total = 0_u64;
+    let mut swap_free = 0_u64;
+
+    for line in buffer[..bytes_read].split(|&byte| byte == b'\n') {
+      let (field, rest) = if let Some(rest) = line.strip_prefix(b"MemTotal:") {
+        (&mut mem_total, rest)
+      } else if let Some(rest) = line.strip_prefix(b"MemAvailable:") {
+        (&mut mem_available, rest)
+      } else if let Some(rest) = line.strip_prefix(b"SwapTotal:") {
+        (&mut swap_total, rest)
+      } else if let Some(rest) = line.strip_prefix(b"SwapFree:") {
+        swap_free = parse_u64_fast(rest.trim_ascii_start());
+        break;
+      } else {
+        continue;
+      };
+      *field = parse_u64_fast(rest.trim_ascii_start());
+    }
+
+    Some(Self {
+      used:       (mem_total - mem_available) << 10,
+      total:      mem_total << 10,
+      swap_used:  (swap_total - swap_free) << 10,
+      swap_total: swap_total << 10,
+    })
+  }
+}
+
+fn write_usage(
+  writer: &mut StackWriter,
+  colors: &Colors,
+  used: u64,
+  total: u64,
+) {
+  let percentage_used =
+    (used * 100 + total / 2).checked_div(total).unwrap_or(0);
+
+  write_gib(writer, used);
   writer.push_str(" GiB / ");
-  write_gib(writer, total_bytes);
+  write_gib(writer, total);
   writer.push_str(" GiB (");
   writer.push_str(colors.cyan);
   writer.push_u64(percentage_used);
@@ -123,65 +177,31 @@ pub fn write_memory_usage(writer: &mut StackWriter, colors: &Colors) {
   writer.push_byte(b')');
 }
 
-/// Gets the system memory usage information.
-/// Writes nothing if `/proc/meminfo` cannot be read.
-#[cfg(target_os = "linux")]
-#[cfg_attr(feature = "hotpath", hotpath::measure)]
-pub fn write_memory_usage(writer: &mut StackWriter, colors: &Colors) {
-  #[cfg_attr(feature = "hotpath", hotpath::measure)]
-  fn parse_memory_info() -> Option<(u64, u64)> {
-    let mut total_memory_kb = 0_u64;
-    let mut available_memory_kb = 0_u64;
-    let mut buffer = [0_u8; 1024];
-
-    // Use fast syscall-based file reading
-    let bytes_read = read_file_fast("/proc/meminfo", &mut buffer).ok()?;
-    let meminfo = &buffer[..bytes_read];
-
-    // Fast scanning for MemTotal and MemAvailable
-    let mut offset = 0;
-    let mut found_total = false;
-    let mut found_available = false;
-
-    while offset < meminfo.len() && (!found_total || !found_available) {
-      let remaining = &meminfo[offset..];
-
-      // Find newline or end
-      let line_end = remaining
-        .iter()
-        .position(|&byte| byte == b'\n')
-        .unwrap_or(remaining.len());
-      let line = &remaining[..line_end];
-
-      if let Some(value) = line.strip_prefix(b"MemTotal:") {
-        total_memory_kb = parse_u64_fast(value.trim_ascii_start());
-        found_total = true;
-      }
-      if let Some(value) = line.strip_prefix(b"MemAvailable:") {
-        available_memory_kb = parse_u64_fast(value.trim_ascii_start());
-        found_available = true;
-      }
-
-      offset += line_end + 1;
-    }
-
-    Some((total_memory_kb - available_memory_kb, total_memory_kb))
-  }
-
-  let Some((used_kb, total_kb)) = parse_memory_info() else {
+/// Writes RAM usage, or nothing if it could not be read.
+pub fn write_memory_usage(
+  writer: &mut StackWriter,
+  colors: &Colors,
+  memory: Option<&Memory>,
+) {
+  let Some(usage) = memory else {
     return;
   };
-  let percentage_used = (used_kb * 100 + total_kb / 2)
-    .checked_div(total_kb)
-    .unwrap_or(0);
+  write_usage(writer, colors, usage.used, usage.total);
+}
 
-  write_kb_as_gib(writer, used_kb);
-  writer.push_str(" GiB / ");
-  write_kb_as_gib(writer, total_kb);
-  writer.push_str(" GiB (");
-  writer.push_str(colors.cyan);
-  writer.push_u64(percentage_used);
-  writer.push_byte(b'%');
-  writer.push_str(colors.reset);
-  writer.push_byte(b')');
+/// Writes swap usage, `Disabled` when there is no swap, or nothing if it could
+/// not be read.
+pub fn write_swap_usage(
+  writer: &mut StackWriter,
+  colors: &Colors,
+  memory: Option<&Memory>,
+) {
+  let Some(usage) = memory else {
+    return;
+  };
+  if usage.swap_total == 0 {
+    writer.push_str("Disabled");
+    return;
+  }
+  write_usage(writer, colors, usage.swap_used, usage.swap_total);
 }
