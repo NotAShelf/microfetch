@@ -289,7 +289,7 @@ fn write_styled_row(
   colors: &colors::Colors,
   stream: &mut &[u8],
 ) {
-  let palette = [colors.blue, colors.cyan, colors.reset];
+  let palette = [colors.l1, colors.l2, colors.icon, colors.key, colors.value, colors.reset];
   let data = *stream;
   let row_end = data
     .iter()
@@ -300,12 +300,12 @@ fn write_styled_row(
 
   let mut pos = 0;
   while pos < row_data.len() {
-    if let marker @ 1..=3 = row_data[pos] {
+    if let marker @ 1..=6 = row_data[pos] {
       writer.push_str(palette[usize::from(marker - 1)]);
       pos += 1;
     } else {
       let chunk_start = pos;
-      while pos < row_data.len() && row_data[pos] > 3 {
+      while pos < row_data.len() && row_data[pos] > 6 {
         pos += 1;
       }
       writer.push_bytes(&row_data[chunk_start..pos]);
@@ -315,16 +315,16 @@ fn write_styled_row(
 
 const ROW_COUNT: usize = 11;
 const ROW_LABELS: &[u8] = concat!(
-  "\x02\u{F313}  \x01System\x03       \u{E621} \0",
-  "\x02\u{E712}  \x01Kernel\x03       \u{E621} \0",
-  "\x02\u{F2DB}  \x01CPU\x03          \u{E621} \0",
-  "\x02\u{F4BC}  \x01Topology\x03     \u{E621} \0",
-  "\x02\u{E795}  \x01Shell\x03        \u{E621} \0",
-  "\x02\u{F017}  \x01Uptime\x03       \u{E621} \0",
-  "\x02\u{F2D2}  \x01Desktop\x03      \u{E621} \0",
-  "\x02\u{F035B}  \x01Memory\x03       \u{E621} \0",
-  "\x02\u{F194E}  \x01Storage (/)\x03  \u{E621} \0",
-  "\x02\u{E22B}  \x01Colors\x03       \u{E621} \0",
+  "\x03\u{F313}  \x04System\x05       \u{E621} \0",
+  "\x03\u{E712}  \x04Kernel\x05       \u{E621} \0",
+  "\x03\u{F2DB}  \x04CPU\x05          \u{E621} \0",
+  "\x03\u{F4BC}  \x04Topology\x05     \u{E621} \0",
+  "\x03\u{E795}  \x04Shell\x05        \u{E621} \0",
+  "\x03\u{F017}  \x04Uptime\x05       \u{E621} \0",
+  "\x03\u{F2D2}  \x04Desktop\x05      \u{E621} \0",
+  "\x03\u{F035B}  \x04Memory\x05       \u{E621} \0",
+  "\x03\u{F194E}  \x04Storage (/)\x05  \u{E621} \0",
+  "\x03\u{E22B}  \x04Colors\x05       \u{E621} \0",
 )
 .as_bytes();
 
