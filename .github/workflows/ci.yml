@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-26.04-arm, macos-latest]
-    uses: manic-systems/workflows/.github/workflows/rust-checks.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    uses: manic-systems/workflows/.github/workflows/rust-checks.yml@02fcd089a850e25bc6eff55f74db80c12b54391e # v2.3.4
     with:
       os: ${{ matrix.os }}
       flake-check: false
@@ -91,7 +91,7 @@ jobs:
           components: ${{ matrix.build-std && 'rust-src' || '' }}
 
       - name: Install wild
-        uses: wild-linker/action@dc926c45399e1842cf81e604f52bdf0ad86a0c09 # v0.10.0
+        uses: wild-linker/action@df0907881edceed370dee3c817eecf8a890430ad # v0.11.0
 
       - name: Put wild on PATH
         run: echo "$RUNNER_TEMP/wild-install" >> "$GITHUB_PATH"
@@ -116,7 +116,7 @@ jobs:
 
   actions:
     name: Actions Lint
-    uses: manic-systems/workflows/.github/workflows/actions-lint.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    uses: manic-systems/workflows/.github/workflows/actions-lint.yml@02fcd089a850e25bc6eff55f74db80c12b54391e # v2.3.4
 
   required:
     name: Required Checks
