@@ -26,7 +26,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
 
       - name: Install the wild linker
-        uses: wild-linker/action@dc926c45399e1842cf81e604f52bdf0ad86a0c09 # v0.10.0
+        uses: wild-linker/action@df0907881edceed370dee3c817eecf8a890430ad # v0.11.0
       - name: Put wild on PATH
         run: echo "$RUNNER_TEMP/wild-install" >> "$GITHUB_PATH"
 

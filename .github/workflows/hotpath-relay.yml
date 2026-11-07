@@ -8,7 +8,7 @@ on:
 
 jobs:
   relay:
-    uses: pawurb/hotpath-rs/.github/workflows/hotpath-relay.yml@9b238fa84222efde573f29eb4bae76dcb5f700c0 # v0.28.6
+    uses: pawurb/hotpath-rs/.github/workflows/hotpath-relay.yml@d1689a707565a67f4ff0b81cdb1b26c7351abede # v0.30.3
     permissions:
       actions: read
       id-token: write
