@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-26.04-arm, macos-latest]
-    uses: manic-systems/workflows/.github/workflows/rust-checks.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    uses: manic-systems/workflows/.github/workflows/rust-checks.yml@02fcd089a850e25bc6eff55f74db80c12b54391e # v2.3.4
     with:
       os: ${{ matrix.os }}
       flake-check: false
@@ -84,14 +84,14 @@ jobs:
           persist-credentials: false
 
       - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
+        uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
         with:
           toolchain: ${{ matrix.toolchain }}
           target: ${{ !matrix.build-std && matrix.target || '' }}
           components: ${{ matrix.build-std && 'rust-src' || '' }}
 
       - name: Install wild
-        uses: wild-linker/action@dc926c45399e1842cf81e604f52bdf0ad86a0c09 # v0.10.0
+        uses: wild-linker/action@df0907881edceed370dee3c817eecf8a890430ad # v0.11.0
 
       - name: Put wild on PATH
         run: echo "$RUNNER_TEMP/wild-install" >> "$GITHUB_PATH"
@@ -116,7 +116,7 @@ jobs:
 
   actions:
     name: Actions Lint
-    uses: manic-systems/workflows/.github/workflows/actions-lint.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    uses: manic-systems/workflows/.github/workflows/actions-lint.yml@02fcd089a850e25bc6eff55f74db80c12b54391e # v2.3.4
 
   required:
     name: Required Checks
