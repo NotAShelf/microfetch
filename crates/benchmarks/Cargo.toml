@@ -9,7 +9,7 @@ publish                = false
 
 [dependencies]
 criterion.workspace      = true
-hotpath                  = { optional = true, version = "0.30.3" }
+hotpath                  = { optional = true, version = "0.31.1" }
 microfetch-lib.workspace = true
 
 [features]
