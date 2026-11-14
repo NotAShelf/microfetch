@@ -23,7 +23,7 @@ jobs:
       contents: write
       id-token: write
     needs: ci
-    uses: manic-systems/workflows/.github/workflows/rust-release.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    uses: manic-systems/workflows/.github/workflows/rust-release.yml@02fcd089a850e25bc6eff55f74db80c12b54391e # v2.3.4
     with:
       stage: prepare
 
@@ -41,7 +41,7 @@ jobs:
           - { os: ubuntu-latest, suffix: linux-amd64 }
           - { os: ubuntu-26.04-arm, suffix: linux-arm64 }
           - { os: macos-latest, suffix: darwin-arm64 }
-    uses: manic-systems/workflows/.github/workflows/rust-build.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    uses: manic-systems/workflows/.github/workflows/rust-build.yml@02fcd089a850e25bc6eff55f74db80c12b54391e # v2.3.4
     with:
       upload: true
       version: ${{ needs.prepare.outputs.version }}
@@ -54,7 +54,7 @@ jobs:
       id-token: write
     needs: [prepare, build]
     if: ${{ needs.prepare.outputs.skip != 'true' && needs.build.result == 'success' }}
-    uses: manic-systems/workflows/.github/workflows/rust-release.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    uses: manic-systems/workflows/.github/workflows/rust-release.yml@02fcd089a850e25bc6eff55f74db80c12b54391e # v2.3.4
     with:
       stage: finalize
       version: ${{ needs.prepare.outputs.version }}
@@ -65,7 +65,7 @@ jobs:
       id-token: write
     needs: [prepare, finalize]
     if: ${{ needs.prepare.outputs.skip != 'true' && needs.finalize.result == 'success' }}
-    uses: manic-systems/workflows/.github/workflows/rust-release.yml@ec457510b197b2eeb8b2ea2d182f31e3ed7157bd # v2.3.3
+    uses: manic-systems/workflows/.github/workflows/rust-release.yml@02fcd089a850e25bc6eff55f74db80c12b54391e # v2.3.4
     with:
       stage: publish
       version: ${{ needs.prepare.outputs.version }}
