@@ -1,15 +1,15 @@
-#[cfg(target_os = "linux")] use core::mem::MaybeUninit;
+#[cfg(any(target_os = "linux", target_os = "android"))] use core::mem::MaybeUninit;
 
 #[cfg(target_os = "macos")]
 use microfetch_asm::darwin::macos_uptime_secs;
-#[cfg(target_os = "linux")] use microfetch_asm::sys_sysinfo;
+#[cfg(any(target_os = "linux", target_os = "android"))] use microfetch_asm::sys_sysinfo;
 
 use crate::StackWriter;
 
 /// Writes the current system uptime, or nothing if it cannot be retrieved.
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write(writer: &mut StackWriter) {
-  #[cfg(target_os = "linux")]
+  #[cfg(any(target_os = "linux", target_os = "android"))]
   let uptime_seconds = {
     let mut info = MaybeUninit::uninit();
     if unsafe { sys_sysinfo(info.as_mut_ptr()) } != 0 {

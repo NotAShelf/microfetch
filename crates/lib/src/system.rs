@@ -1,6 +1,6 @@
 use core::mem::MaybeUninit;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use microfetch_asm::read_file_fast;
 use microfetch_asm::{StatfsBuf, sys_statfs};
 
@@ -79,7 +79,7 @@ fn write_gib(writer: &mut StackWriter, bytes: u64) {
 }
 
 /// Fast integer parsing without stdlib overhead.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[inline]
 fn parse_u64_fast(bytes: &[u8]) -> u64 {
   let mut result = 0_u64;
@@ -120,7 +120,7 @@ impl Memory {
   }
 
   /// Reads RAM and swap usage from `/proc/meminfo`.
-  #[cfg(target_os = "linux")]
+  #[cfg(any(target_os = "linux", target_os = "android"))]
   #[cfg_attr(feature = "hotpath", hotpath::measure)]
   #[must_use = "this only reads /proc/meminfo"]
   pub fn read() -> Option<Self> {

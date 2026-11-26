@@ -1,6 +1,6 @@
 #[cfg(target_os = "macos")] use core::str;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use microfetch_asm::read_file_fast;
 
 use crate::{StackWriter, UtsName};
@@ -35,7 +35,7 @@ pub fn write_os_pretty_name(writer: &mut StackWriter) {
 
 /// Writes the pretty name of the OS from `/etc/os-release`, or nothing if it
 /// cannot be read.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_os_pretty_name(writer: &mut StackWriter) {
   // Fast byte-level scanning for PRETTY_NAME=
@@ -101,7 +101,7 @@ pub fn write_machine(writer: &mut StackWriter) {
 
 /// Writes the hardware model from the DMI product or board name, or the
 /// devicetree model on boards without DMI.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_machine(writer: &mut StackWriter) {
   // https://github.com/fastfetch-cli/fastfetch/blob/2.70.0/src/common/impl/smbios.c#L7-L47
