@@ -1,12 +1,12 @@
 use core::str;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use microfetch_asm::read_file_fast;
 
 use crate::StackWriter;
 
 /// Writes CPU model name (trimmed) to the writer.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_cpu_name(writer: &mut StackWriter) {
   write_model_name(writer);
@@ -32,7 +32,7 @@ pub fn write_cpu_name(writer: &mut StackWriter) {
 /// Format: `{cores} cores ({p}p/{e}e), {threads} threads` on hybrid Intel,
 /// `{cores} cores, {threads} threads` otherwise. Writes nothing if the thread
 /// count cannot be determined.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(feature = "hotpath", hotpath::measure)]
 pub fn write_cpu_cores(writer: &mut StackWriter) {
   let Some(threads) = get_thread_count() else {
@@ -100,7 +100,7 @@ fn write_cores(
 }
 
 /// Count online threads via `sched_getaffinity(2)`.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn get_thread_count() -> Option<u32> {
   let mut mask = [0_u8; 128];
   let ret = unsafe {
@@ -115,7 +115,7 @@ fn get_thread_count() -> Option<u32> {
 }
 
 /// Derive physical core count from thread count and topology.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn get_core_count(threads: u32) -> u32 {
   let Some(smt_width) =
     count_cpulist("/sys/devices/system/cpu/cpu0/topology/thread_siblings_list")
@@ -130,7 +130,7 @@ fn get_core_count(threads: u32) -> u32 {
 
 /// Detect P-core and E-core counts via sysfs PMU device files, which is done
 /// by reading `/sys/devices/cpu_core/cpus` and `/sys/devices/cpu_atom/cpus`.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn get_pe_cores() -> Option<(u32, u32)> {
   if !cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
     return None;
@@ -142,7 +142,7 @@ fn get_pe_cores() -> Option<(u32, u32)> {
 }
 
 /// Count the cores behind a PMU's cpulist, using its first CPU's SMT width.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn count_pmu_cores(path: &str) -> Option<u32> {
   let mut buf = [0_u8; 64];
   let len = read_file_fast(path, &mut buf).ok()?;
@@ -167,7 +167,7 @@ fn count_pmu_cores(path: &str) -> Option<u32> {
 }
 
 /// Parse a cpulist file and count listed CPUs.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn count_cpulist(path: &str) -> Option<u32> {
   let mut buf = [0_u8; 64];
   let len = read_file_fast(path, &mut buf).ok()?;
@@ -175,7 +175,7 @@ fn count_cpulist(path: &str) -> Option<u32> {
 }
 
 /// Count the CPUs in cpulist text such as `0-3,8\n`, which may be empty.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn cpulist_len(data: &[u8]) -> u32 {
   let mut count = 0_u32;
   let mut pos = 0;
@@ -201,7 +201,7 @@ fn cpulist_len(data: &[u8]) -> u32 {
 }
 
 /// Parse a decimal number from a byte slice, advancing the index.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn parse_num(data: &[u8], pos: &mut usize) -> u32 {
   let mut value = 0_u32;
   while *pos < data.len() && data[*pos].is_ascii_digit() {
@@ -213,7 +213,7 @@ fn parse_num(data: &[u8], pos: &mut usize) -> u32 {
 
 /// Build `/sys/devices/system/cpu/cpu{n}{suffix}` into buf, returning the
 /// byte length written.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn format_cpu_path(buf: &mut [u8; 64], cpu: u32, suffix: &[u8]) -> usize {
   const PREFIX: &[u8] = b"/sys/devices/system/cpu/cpu";
   buf[..PREFIX.len()].copy_from_slice(PREFIX);
@@ -239,7 +239,7 @@ fn format_cpu_path(buf: &mut [u8; 64], cpu: u32, suffix: &[u8]) -> usize {
 }
 
 /// Read one CPU's `cpuinfo_max_freq`, in kHz.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn read_cpu_max_khz(cpu: u32) -> Option<u32> {
   let mut path = [0_u8; 64];
   let path_len = format_cpu_path(&mut path, cpu, b"/cpufreq/cpuinfo_max_freq");
@@ -260,7 +260,7 @@ fn read_cpu_max_khz(cpu: u32) -> Option<u32> {
 /// Highest CPU id the kernel lists in `/sys/devices/system/cpu/present`,
 /// which is an ascending cpulist.
 // https://github.com/torvalds/linux/blob/v6.19/drivers/base/cpu.c#L273-L286
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn highest_present_cpu() -> Option<u32> {
   let mut buf = [0_u8; 64];
   let len = read_file_fast("/sys/devices/system/cpu/present", &mut buf).ok()?;
@@ -278,7 +278,7 @@ fn highest_present_cpu() -> Option<u32> {
 }
 
 /// Read CPU frequency in MHz. Tries sysfs first, then cpuinfo data.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
   let last_cpu = highest_present_cpu().unwrap_or(63);
   let first_khz = read_cpu_max_khz(0);
@@ -375,7 +375,7 @@ fn get_cpu_freq_mhz(cpuinfo: &[u8]) -> Option<u32> {
 
 /// Parse CPU model name from `/proc/cpuinfo` and write it directly.
 /// Appends CPU frequency if available.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn write_model_name(writer: &mut StackWriter) {
   let mut buf = [0_u8; 1024];
   let Ok(len) = read_file_fast("/proc/cpuinfo", &mut buf) else {
@@ -424,7 +424,7 @@ fn write_model_name(writer: &mut StackWriter) {
   writer.push_str(" GHz");
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[derive(Clone, Copy)]
 enum ArmFamily {
   Cortex,
@@ -433,7 +433,7 @@ enum ArmFamily {
   Ampere,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl ArmFamily {
   const fn implementer(self) -> u32 {
     match self {
@@ -452,14 +452,14 @@ impl ArmFamily {
   }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 struct ArmPart {
   part:   u16,
   family: ArmFamily,
   model:  [u8; 7],
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 const fn arm_part(part: u16, family: ArmFamily, model: &str) -> ArmPart {
   let bytes = model.as_bytes();
   let mut padded = [0_u8; 7];
@@ -476,7 +476,7 @@ const fn arm_part(part: u16, family: ArmFamily, model: &str) -> ArmPart {
 }
 
 /// Fixed-width names keep the table pointer-free :)
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 static ARM_PARTS: [ArmPart; 45] = {
   use ArmFamily::{Ampere, C1, Cortex, Neoverse};
   [
@@ -529,7 +529,7 @@ static ARM_PARTS: [ArmPart; 45] = {
 };
 
 /// Name the core from `CPU implementer` and `CPU part` on ACPI aarch64.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn write_arm_part(writer: &mut StackWriter, data: &[u8]) -> bool {
   let hex = |key| {
     let digits = extract_field(data, key)?.strip_prefix("0x")?;
@@ -562,7 +562,7 @@ fn write_arm_part(writer: &mut StackWriter, data: &[u8]) -> bool {
 }
 
 /// Extract a human-readable CPU name from cpuinfo fields.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn extract_name(data: &[u8]) -> Option<&str> {
   for key in &[
     b"model name".as_slice(),
@@ -588,7 +588,7 @@ fn extract_name(data: &[u8]) -> Option<&str> {
 /// The file holds NUL-separated `vendor,model` strings from most-specific
 /// (board) to most-generic (`SoC`); we take the last entry and write just
 /// the model portion after the comma.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn write_dt_compatible(writer: &mut StackWriter) -> bool {
   let mut buf = [0_u8; 256];
   let Ok(len) =
@@ -623,7 +623,7 @@ fn write_dt_compatible(writer: &mut StackWriter) -> bool {
 }
 
 /// Extract value of first occurrence of `key` in cpuinfo.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn extract_field<'data>(data: &'data [u8], key: &[u8]) -> Option<&'data str> {
   let mut index = 0;
   while index < data.len() {
@@ -655,7 +655,7 @@ fn extract_field<'data>(data: &'data [u8], key: &[u8]) -> Option<&'data str> {
 }
 
 /// Strip noise from model names.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn trim(name: &str) -> &str {
   let mut rest = name.trim_ascii_end();
 
